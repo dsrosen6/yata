@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-type AllRepos struct {
-	Tasks TaskRepo
-}
-
 type Task struct {
 	ID        int64
 	Title     string

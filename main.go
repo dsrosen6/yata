@@ -5,7 +5,9 @@ import (
 	_ "embed"
 	"fmt"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dsrosen6/yata/sqlitedb"
+	"github.com/dsrosen6/yata/tui"
 	_ "modernc.org/sqlite"
 )
 
@@ -20,19 +22,26 @@ func main() {
 
 func run() error {
 	ctx := context.Background()
-
-	db, err := initDB(ctx)
+	h, err := sqlitedb.NewHandler(schema, "./app.db")
 	if err != nil {
-		return fmt.Errorf("initializing db: %w", err)
+		return fmt.Errorf("initializing sqlite handler: %w", err)
 	}
 
 	defer func() {
-		if err := db.Close(); err != nil {
-			fmt.Println("Error closing db:", err)
+		if err := h.Close(); err != nil {
+			fmt.Println("Error closing handler:", err)
 		}
 	}()
 
-	q := sqlitedb.New(db)
-	_ = sqlitedb.NewRepos(q)
+	r, err := h.InitStores(ctx)
+	if err != nil {
+		return fmt.Errorf("initializing stores: %w", err)
+	}
+
+	m := tui.InitialModel(r)
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("running tui: %w", err)
+	}
 	return nil
 }
