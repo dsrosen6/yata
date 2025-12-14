@@ -2,11 +2,11 @@ package tui
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
 	"github.com/dsrosen6/yata/models"
+	"github.com/dsrosen6/yata/tui/input"
 )
 
 type (
@@ -15,21 +15,34 @@ type (
 	tasksRefreshedMsg struct{ tasks []*models.Task }
 )
 
-func createTaskForm() *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Title").
-				Key("title").
-				Validate(func(s string) error {
-					if s == "" {
-						return errors.New("title is required")
-					}
-					return nil
-				}).
-				Inline(true),
-		),
-	).WithShowHelp(false).WithTheme(huh.ThemeBase())
+type taskEntryForm struct {
+	Form *input.Model
+}
+
+func newTaskEntryForm() (*taskEntryForm, error) {
+	o := &input.Options{
+		FieldKeys: []string{"Title"},
+	}
+
+	f, err := input.InitialInputModel(o)
+	if err != nil {
+		return nil, fmt.Errorf("creating model: %w", err)
+	}
+
+	return &taskEntryForm{
+		Form: f,
+	}, nil
+}
+
+func (te *taskEntryForm) task() *models.Task {
+	t, ok := te.Form.Result["Title"]
+	if !ok {
+		return nil
+	}
+
+	return &models.Task{
+		Title: t,
+	}
 }
 
 func (m *Model) insertTask(ctx context.Context, t *models.Task) tea.Cmd {

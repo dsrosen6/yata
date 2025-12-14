@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
 	"github.com/dsrosen6/yata/models"
+	"github.com/dsrosen6/yata/tui/input"
 )
 
 var ctx = context.Background()
@@ -19,7 +19,7 @@ type Model struct {
 
 	cursor    int
 	taskMode  taskMode
-	entryForm *huh.Form
+	entryForm *taskEntryForm
 	selected  map[int]struct{}
 }
 
@@ -30,14 +30,19 @@ const (
 	taskModeCreating taskMode = "creating"
 )
 
-func InitialModel(r *models.AllRepos) *Model {
+func InitialModel(r *models.AllRepos) (*Model, error) {
+	ef, err := newTaskEntryForm()
+	if err != nil {
+		return nil, fmt.Errorf("creating task entry form")
+	}
+
 	return &Model{
 		repos:     r,
 		tasks:     []*models.Task{},
 		taskMode:  taskModeViewing,
-		entryForm: createTaskForm(),
+		entryForm: ef,
 		selected:  make(map[int]struct{}),
-	}
+	}, nil
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -71,8 +76,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "a":
 				m.taskMode = taskModeCreating
-				m.entryForm = createTaskForm()
-				return m, m.entryForm.Init()
+				return m, m.entryForm.Form.Init()
 			}
 
 		case refreshTasksMsg:
@@ -84,32 +88,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case taskModeCreating:
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			case "esc":
-				m.taskMode = taskModeViewing
-				return m, nil
-			}
+		form, cmd := m.entryForm.Form.Update(msg)
+		m.entryForm.Form = form.(*input.Model)
+
+		if m.entryForm.Form.State == input.StateDone {
+			t := m.entryForm.task()
+			m.taskMode = taskModeViewing
+
+			m.entryForm, _ = newTaskEntryForm()
+			return m, m.insertTask(ctx, t)
 		}
 
-		if m.entryForm != nil {
-			form, cmd := m.entryForm.Update(msg)
-			if f, ok := form.(*huh.Form); ok {
-				m.entryForm = f
-			}
-
-			if m.entryForm.State == huh.StateCompleted {
-				t := &models.Task{
-					Title: m.entryForm.GetString("title"),
-				}
-
-				m.tasks = append(m.tasks, t)
-				m.taskMode = taskModeViewing
-				return m, m.insertTask(ctx, t)
-			}
-			return m, cmd
+		if km, ok := msg.(tea.KeyMsg); ok && km.String() == "esc" {
+			m.taskMode = taskModeViewing
+			m.entryForm, _ = newTaskEntryForm()
+			return m, nil
 		}
+
+		return m, cmd
 	}
 
 	return m, nil
@@ -120,11 +116,11 @@ func (m *Model) View() string {
 	b.WriteString(tasksOutput(m.cursor, m.tasks))
 
 	if m.taskMode == taskModeCreating {
-		fmt.Fprintf(&b, "%s\n", m.entryForm.View())
+		fmt.Fprintf(&b, "%s\n", m.entryForm.Form.View())
 	}
 
 	if m.debug {
-		fmt.Fprintf(&b, "Task Mode: %s\nForm State: %v\n", m.taskMode, m.entryForm.State)
+		fmt.Fprintf(&b, "Task Mode: %s\nForm State: %d\n", m.taskMode, m.entryForm.Form.State)
 	}
 
 	return b.String()

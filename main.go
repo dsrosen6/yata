@@ -38,7 +38,11 @@ func run() error {
 		return fmt.Errorf("initializing stores: %w", err)
 	}
 
-	m := tui.InitialModel(r)
+	m, err := tui.InitialModel(r)
+	if err != nil {
+		return fmt.Errorf("initializing model: %w", err)
+	}
+
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("running tui: %w", err)
