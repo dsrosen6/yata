@@ -11,25 +11,23 @@ import (
 
 const createTask = `-- name: CreateTask :one
 INSERT INTO task (
-    title, details, complete
+    title, complete
 ) VALUES (
-    ?, ?, ?
-) RETURNING id, title, details, complete, created_at, updated_at
+    ?, ?
+) RETURNING id, title, complete, created_at, updated_at
 `
 
 type CreateTaskParams struct {
 	Title    string
-	Details  *string
 	Complete bool
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg *CreateTaskParams) (*Task, error) {
-	row := q.db.QueryRowContext(ctx, createTask, arg.Title, arg.Details, arg.Complete)
+	row := q.db.QueryRowContext(ctx, createTask, arg.Title, arg.Complete)
 	var i Task
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
-		&i.Details,
 		&i.Complete,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -48,7 +46,7 @@ func (q *Queries) DeleteTask(ctx context.Context, id int64) error {
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, title, details, complete, created_at, updated_at FROM task
+SELECT id, title, complete, created_at, updated_at FROM task
 WHERE id = ? LIMIT 1
 `
 
@@ -58,7 +56,6 @@ func (q *Queries) GetTask(ctx context.Context, id int64) (*Task, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
-		&i.Details,
 		&i.Complete,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -67,7 +64,7 @@ func (q *Queries) GetTask(ctx context.Context, id int64) (*Task, error) {
 }
 
 const listAllTasks = `-- name: ListAllTasks :many
-SELECT id, title, details, complete, created_at, updated_at FROM task
+SELECT id, title, complete, created_at, updated_at FROM task
 `
 
 func (q *Queries) ListAllTasks(ctx context.Context) ([]*Task, error) {
@@ -82,7 +79,6 @@ func (q *Queries) ListAllTasks(ctx context.Context) ([]*Task, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
-			&i.Details,
 			&i.Complete,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -104,32 +100,24 @@ const updateTask = `-- name: UpdateTask :one
 UPDATE task
 SET
     title = ?,
-    details = ?,
     complete = ?,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = ?
-RETURNING id, title, details, complete, created_at, updated_at
+RETURNING id, title, complete, created_at, updated_at
 `
 
 type UpdateTaskParams struct {
 	Title    string
-	Details  *string
 	Complete bool
 	ID       int64
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg *UpdateTaskParams) (*Task, error) {
-	row := q.db.QueryRowContext(ctx, updateTask,
-		arg.Title,
-		arg.Details,
-		arg.Complete,
-		arg.ID,
-	)
+	row := q.db.QueryRowContext(ctx, updateTask, arg.Title, arg.Complete, arg.ID)
 	var i Task
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
-		&i.Details,
 		&i.Complete,
 		&i.CreatedAt,
 		&i.UpdatedAt,

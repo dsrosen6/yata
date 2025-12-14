@@ -65,7 +65,6 @@ func (tr *TaskRepo) Delete(ctx context.Context, id int64) error {
 func taskToCreateParams(t *models.Task) *CreateTaskParams {
 	return &CreateTaskParams{
 		Title:    t.Title,
-		Details:  t.Details,
 		Complete: t.Complete,
 	}
 }
@@ -74,7 +73,6 @@ func taskToUpdateParams(t *models.Task) *UpdateTaskParams {
 	return &UpdateTaskParams{
 		ID:       t.ID,
 		Title:    t.Title,
-		Details:  t.Details,
 		Complete: t.Complete,
 	}
 }
@@ -92,7 +90,6 @@ func dbTaskToTask(d *Task) *models.Task {
 	return &models.Task{
 		ID:        d.ID,
 		Title:     d.Title,
-		Details:   d.Details,
 		Complete:  d.Complete,
 		CreatedAt: d.CreatedAt,
 		UpdatedAt: d.UpdatedAt,

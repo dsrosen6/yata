@@ -8,7 +8,6 @@ import (
 type Task struct {
 	ID        int64
 	Title     string
-	Details   *string
 	Complete  bool
 	CreatedAt *time.Time
 	UpdatedAt *time.Time

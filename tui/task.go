@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -20,10 +21,12 @@ func createTaskForm() *huh.Form {
 			huh.NewInput().
 				Title("Title").
 				Key("title").
-				Inline(true),
-			huh.NewInput().
-				Title("Description").
-				Key("description").
+				Validate(func(s string) error {
+					if s == "" {
+						return errors.New("title is required")
+					}
+					return nil
+				}).
 				Inline(true),
 		),
 	).WithShowHelp(false).WithTheme(huh.ThemeBase())

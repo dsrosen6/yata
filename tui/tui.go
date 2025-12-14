@@ -71,6 +71,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "a":
 				m.taskMode = taskModeCreating
+				m.entryForm = createTaskForm()
 				return m, m.entryForm.Init()
 			}
 
@@ -83,24 +84,32 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case taskModeCreating:
-		form, cmd := m.entryForm.Update(msg)
-		if f, ok := form.(*huh.Form); ok {
-			m.entryForm = f
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "esc":
+				m.taskMode = taskModeViewing
+				return m, nil
+			}
 		}
 
-		if m.entryForm.State == huh.StateCompleted {
-			d := m.entryForm.GetString("description")
-			t := &models.Task{
-				Title:   m.entryForm.GetString("title"),
-				Details: &d,
+		if m.entryForm != nil {
+			form, cmd := m.entryForm.Update(msg)
+			if f, ok := form.(*huh.Form); ok {
+				m.entryForm = f
 			}
 
-			m.tasks = append(m.tasks, t)
-			m.taskMode = taskModeViewing
-			m.entryForm = createTaskForm() // reset the form
-			return m, m.insertTask(ctx, t)
+			if m.entryForm.State == huh.StateCompleted {
+				t := &models.Task{
+					Title: m.entryForm.GetString("title"),
+				}
+
+				m.tasks = append(m.tasks, t)
+				m.taskMode = taskModeViewing
+				return m, m.insertTask(ctx, t)
+			}
+			return m, cmd
 		}
-		return m, cmd
 	}
 
 	return m, nil
