@@ -18,7 +18,6 @@ type (
 	Model struct {
 		repos *models.AllRepos
 		tasks []*models.Task
-		size  size
 
 		cursor     int
 		taskMode   taskMode
@@ -27,6 +26,7 @@ type (
 		pendingAdd bool
 
 		styles
+		size
 	}
 
 	styles struct {
@@ -65,10 +65,12 @@ func InitialModel(r *models.AllRepos, opts Opts) (*Model, error) {
 }
 
 func generateStyles(o Opts) styles {
+	fs := style.FocusedStyle(o.FocusedColor)
+	ufs := style.UnfocusedStyle(fs, o.UnfocusedColor)
 	return styles{
 		borderStyle:    style.BorderStyle(o.BorderColor),
-		focusedStyle:   style.FocusedStyle(o.FocusedColor),
-		unfocusedStyle: style.UnfocusedStyle(o.UnfocusedColor),
+		focusedStyle:   fs,
+		unfocusedStyle: ufs,
 	}
 }
 
@@ -80,8 +82,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Universal
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.size.width = msg.Width
-		m.size.height = msg.Height
+		m.width = msg.Width
+		m.height = msg.Height
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
@@ -159,24 +161,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	header := m.borderStyle.
-		Align(lipgloss.Center).
-		Width(m.size.width).
-		Border(lipgloss.NormalBorder(), false, false, true, false).
-		Render("Header")
+	root := lipgloss.NewStyle().Width(m.width).Height(m.height).Align(lipgloss.Center)
+	tbar := titleBar(" tasks ", root.GetWidth())
+	op := lipgloss.NewStyle().Padding(0, 1).Render(m.tasksOutput())
+	jv := lipgloss.JoinVertical(lipgloss.Top, tbar, op)
 
-	footer := lipgloss.NewStyle().
-		Align(lipgloss.Center).
-		Width(m.size.width).
-		Render("Footer")
+	return root.Render(jv)
+}
 
-	content := lipgloss.NewStyle().
-		Width(m.size.width).
-		Height(m.size.height-lipgloss.Height(header)-lipgloss.Height(footer)).
-		Align(lipgloss.Center, lipgloss.Center).
-		Render(m.tasksOutput())
-
-	return lipgloss.JoinVertical(lipgloss.Top, header, content, footer)
+func titleBar(text string, width int) string {
+	remaining := max(0, width-lipgloss.Width(text))
+	leftBLen := max(0, (width/2)-lipgloss.Width(text))
+	rightBLen := max(0, remaining-leftBLen)
+	rep := "─"
+	str := strings.Repeat(rep, leftBLen) + text + strings.Repeat(rep, rightBLen)
+	return str
 }
 
 func (m *Model) tasksOutput() string {

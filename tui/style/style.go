@@ -2,7 +2,11 @@ package style
 
 import "github.com/charmbracelet/lipgloss"
 
-var DefaultColor = lipgloss.Color("205")
+var (
+	DefaultColor        lipgloss.Color // default terminal color
+	DefaultFocusedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(DefaultColor))
+)
 
 func BorderStyle(color string) lipgloss.Style {
 	c := DefaultColor
@@ -14,20 +18,18 @@ func BorderStyle(color string) lipgloss.Style {
 }
 
 func FocusedStyle(color string) lipgloss.Style {
-	c := DefaultColor
+	s := DefaultFocusedStyle
 	if color != "" {
-		c = lipgloss.Color(color)
+		s = s.Foreground(lipgloss.Color(color))
 	}
 
-	return lipgloss.NewStyle().Foreground(c)
+	return s
 }
 
-func UnfocusedStyle(color string) lipgloss.Style {
-	var c lipgloss.Color
-	if color != "" {
-		c = lipgloss.Color(color)
+func UnfocusedStyle(focusStyle lipgloss.Style, overrideColor string) lipgloss.Style {
+	if overrideColor != "" {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(overrideColor))
 	}
 
-	s := lipgloss.NewStyle().Foreground(c)
-	return s
+	return focusStyle.Faint(true)
 }
