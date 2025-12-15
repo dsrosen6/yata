@@ -19,9 +19,12 @@ type taskEntryForm struct {
 	Form *input.Model
 }
 
-func newTaskEntryForm() (*taskEntryForm, error) {
-	o := &input.Options{
-		FieldKeys: []string{"Title"},
+func newTaskEntryForm(s styles) (*taskEntryForm, error) {
+	o := &input.Opts{
+		FieldKeys:        []string{"Title"},
+		PromptIfOneField: false,
+		FocusedStyle:     s.focusedStyle,
+		UnfocusedStyle:   s.unfocusedStyle,
 	}
 
 	f, err := input.InitialInputModel(o)
@@ -34,8 +37,8 @@ func newTaskEntryForm() (*taskEntryForm, error) {
 	}, nil
 }
 
-func (te *taskEntryForm) task() *models.Task {
-	t, ok := te.Form.Result["Title"]
+func taskFromInputResult(r input.Result) *models.Task {
+	t, ok := r["Title"]
 	if !ok {
 		return nil
 	}

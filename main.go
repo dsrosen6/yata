@@ -38,7 +38,12 @@ func run() error {
 		return fmt.Errorf("initializing stores: %w", err)
 	}
 
-	m, err := tui.InitialModel(r)
+	opts := tui.Opts{
+		BorderColor:  "#7dc4e4",
+		FocusedColor: "#7dc4e4",
+	}
+
+	m, err := tui.InitialModel(r, opts)
 	if err != nil {
 		return fmt.Errorf("initializing model: %w", err)
 	}

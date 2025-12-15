@@ -6,43 +6,70 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/dsrosen6/yata/models"
 	"github.com/dsrosen6/yata/tui/input"
+	"github.com/dsrosen6/yata/tui/style"
 )
 
 var ctx = context.Background()
 
-type Model struct {
-	debug bool
-	repos *models.AllRepos
-	tasks []*models.Task
+type (
+	Model struct {
+		repos *models.AllRepos
+		tasks []*models.Task
+		size  size
 
-	cursor    int
-	taskMode  taskMode
-	entryForm *taskEntryForm
-	selected  map[int]struct{}
-}
+		cursor     int
+		taskMode   taskMode
+		entryForm  *taskEntryForm
+		selected   map[int]struct{}
+		pendingAdd bool
 
-type taskMode string
+		styles
+	}
+
+	styles struct {
+		borderStyle    lipgloss.Style
+		focusedStyle   lipgloss.Style
+		unfocusedStyle lipgloss.Style
+	}
+
+	size struct {
+		width  int
+		height int
+	}
+
+	Opts struct {
+		BorderColor    string
+		FocusedColor   string
+		UnfocusedColor string
+	}
+
+	taskMode string
+)
 
 const (
 	taskModeViewing  taskMode = "viewing"
 	taskModeCreating taskMode = "creating"
 )
 
-func InitialModel(r *models.AllRepos) (*Model, error) {
-	ef, err := newTaskEntryForm()
-	if err != nil {
-		return nil, fmt.Errorf("creating task entry form")
-	}
-
+func InitialModel(r *models.AllRepos, opts Opts) (*Model, error) {
 	return &Model{
-		repos:     r,
-		tasks:     []*models.Task{},
-		taskMode:  taskModeViewing,
-		entryForm: ef,
-		selected:  make(map[int]struct{}),
+		styles:   generateStyles(opts),
+		repos:    r,
+		tasks:    []*models.Task{},
+		taskMode: taskModeViewing,
+		selected: make(map[int]struct{}),
 	}, nil
+}
+
+func generateStyles(o Opts) styles {
+	return styles{
+		borderStyle:    style.BorderStyle(o.BorderColor),
+		focusedStyle:   style.FocusedStyle(o.FocusedColor),
+		unfocusedStyle: style.UnfocusedStyle(o.UnfocusedColor),
+	}
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -50,9 +77,16 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Universal quit bind
-	if msg, ok := msg.(tea.KeyMsg); ok && msg.String() == "ctrl+c" {
-		return m, tea.Quit
+	// Universal
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.size.width = msg.Width
+		m.size.height = msg.Height
+
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
 	}
 
 	switch m.taskMode {
@@ -66,7 +100,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = cursorUp(m.cursor, len(m.tasks)-1)
 			case "down", "j":
 				m.cursor = cursorDown(m.cursor, len(m.tasks)-1)
-			case "enter":
+			case "enter", " ":
 				if len(m.tasks) > 0 {
 					return m, m.toggleTaskComplete(ctx, m.tasks[m.cursor])
 				}
@@ -76,6 +110,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "a":
 				m.taskMode = taskModeCreating
+				m.pendingAdd = true
+				m.entryForm, _ = newTaskEntryForm(m.styles)
 				return m, m.entryForm.Form.Init()
 			}
 
@@ -84,6 +120,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tasksRefreshedMsg:
 			m.tasks = msg.tasks
+			if len(m.tasks) == 0 {
+				m.cursor = 0
+			} else if m.pendingAdd {
+				m.cursor = len(m.tasks) - 1
+			} else if m.cursor >= len(m.tasks) {
+				m.cursor = len(m.tasks) - 1
+			}
+
+			m.pendingAdd = false
 			return m, nil
 		}
 
@@ -91,18 +136,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		form, cmd := m.entryForm.Form.Update(msg)
 		m.entryForm.Form = form.(*input.Model)
 
-		if m.entryForm.Form.State == input.StateDone {
-			t := m.entryForm.task()
-			m.taskMode = taskModeViewing
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "esc":
+				m.taskMode = taskModeViewing
+				m.entryForm, _ = newTaskEntryForm(m.styles)
+				m.pendingAdd = false
+				return m, nil
+			}
 
-			m.entryForm, _ = newTaskEntryForm()
+		case input.ResultMsg:
+			m.taskMode = taskModeViewing
+			t := taskFromInputResult(msg.Result)
 			return m, m.insertTask(ctx, t)
-		}
-
-		if km, ok := msg.(tea.KeyMsg); ok && km.String() == "esc" {
-			m.taskMode = taskModeViewing
-			m.entryForm, _ = newTaskEntryForm()
-			return m, nil
 		}
 
 		return m, cmd
@@ -112,39 +159,53 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	var b strings.Builder
-	b.WriteString(tasksOutput(m.cursor, m.tasks))
+	header := m.borderStyle.
+		Align(lipgloss.Center).
+		Width(m.size.width).
+		Border(lipgloss.NormalBorder(), false, false, true, false).
+		Render("Header")
 
-	if m.taskMode == taskModeCreating {
-		fmt.Fprintf(&b, "%s\n", m.entryForm.Form.View())
-	}
+	footer := lipgloss.NewStyle().
+		Align(lipgloss.Center).
+		Width(m.size.width).
+		Render("Footer")
 
-	if m.debug {
-		fmt.Fprintf(&b, "Task Mode: %s\nForm State: %d\n", m.taskMode, m.entryForm.Form.State)
-	}
+	content := lipgloss.NewStyle().
+		Width(m.size.width).
+		Height(m.size.height-lipgloss.Height(header)-lipgloss.Height(footer)).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(m.tasksOutput())
 
-	return b.String()
+	return lipgloss.JoinVertical(lipgloss.Top, header, content, footer)
 }
 
-func tasksOutput(cursor int, tasks []*models.Task) string {
-	if len(tasks) == 0 {
+func (m *Model) tasksOutput() string {
+	if len(m.tasks) == 0 && m.taskMode != taskModeCreating && !m.pendingAdd {
 		return "No tasks found\n"
 	}
 
+	uncheckedIcon := "󰄱"
+	checkedIcon := "󰄵"
 	var b strings.Builder
-	b.WriteString("Current Tasks:\n")
-	for i, t := range tasks {
-		cstr := " "
-		if cursor == i {
-			cstr = ">"
+	for i, t := range m.tasks {
+
+		checked := uncheckedIcon
+		if t.Complete {
+			checked = checkedIcon
 		}
 
-		checked := "󰄱"
-		if t.Complete {
-			checked = "󰄵"
+		s := fmt.Sprintf("%s %s", checked, t.Title)
+		if m.cursor == i && m.taskMode != taskModeCreating {
+			b.WriteString(m.focusedStyle.Render(s))
+		} else {
+			b.WriteString(m.unfocusedStyle.Render(s))
 		}
-		s := fmt.Sprintf("%s %s %s\n", cstr, checked, t.Title)
-		b.WriteString(s)
+		b.WriteRune('\n')
+	}
+
+	if m.taskMode == taskModeCreating {
+		b.WriteString(m.focusedStyle.Render(uncheckedIcon + " "))
+		b.WriteString(m.entryForm.Form.View())
 	}
 
 	return b.String()

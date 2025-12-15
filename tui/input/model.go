@@ -12,48 +12,45 @@ import (
 )
 
 type (
-	Options struct {
-		FocusedColor    string
-		UnfocusedColors string
-		CursorMode      cursor.Mode
-		FieldKeys       []string
+	Opts struct {
+		FocusedStyle     lipgloss.Style
+		UnfocusedStyle   lipgloss.Style
+		CursorMode       cursor.Mode
+		FieldKeys        []string
+		PromptIfOneField bool
 	}
 
 	Model struct {
 		Inputs []textinput.Model
-		State  State
-		Result Result
+		Keys   []string
+		Opts   Opts
 
-		focusedStyle   lipgloss.Style
-		unfocusedStyle lipgloss.Style
-		cursor         cursor.Model
-		focusIndex     int
+		focusedStyle     lipgloss.Style
+		unfocusedStyle   lipgloss.Style
+		cursor           cursor.Model
+		focusIndex       int
+		promptIfOneField bool
 	}
 
 	Result    map[string]string
-	ResultMsg struct{ result Result }
-	State     int
-)
-
-const (
-	StateActive State = iota
-	StateDone
+	ResultMsg struct{ Result }
 )
 
 var ErrNoFields = errors.New("no input fields provided")
 
-func InitialInputModel(c *Options) (*Model, error) {
-	if len(c.FieldKeys) == 0 {
+func InitialInputModel(o *Opts) (*Model, error) {
+	if len(o.FieldKeys) == 0 {
 		return nil, ErrNoFields
 	}
 
-	f := append([]string{}, c.FieldKeys...)
+	f := append([]string{}, o.FieldKeys...)
 	m := &Model{
-		Inputs:         make([]textinput.Model, len(f)),
-		Result:         make(Result, len(c.FieldKeys)),
-		focusedStyle:   focusedStyle(c.FocusedColor),
-		unfocusedStyle: unfocusedStyle(c.UnfocusedColors),
-		cursor:         makeCursor(c.CursorMode, focusedStyle(c.FocusedColor)),
+		Inputs:           make([]textinput.Model, len(f)),
+		Keys:             f,
+		focusedStyle:     o.FocusedStyle,
+		unfocusedStyle:   o.UnfocusedStyle,
+		cursor:           makeCursor(o.CursorMode, o.FocusedStyle),
+		promptIfOneField: o.PromptIfOneField,
 	}
 
 	var t textinput.Model
@@ -61,8 +58,11 @@ func InitialInputModel(c *Options) (*Model, error) {
 		t = textinput.New()
 		t.Cursor = m.cursor
 		t.Cursor.Style = m.focusedStyle
+
 		t.Prompt = fmt.Sprintf("%s > ", f[i])
-		t.CharLimit = 32
+		if len(m.Inputs) == 1 && !m.promptIfOneField {
+			t.Prompt = ""
+		}
 
 		if i == 0 {
 			t.Focus()
@@ -92,7 +92,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			s := msg.String()
 
 			if s == "enter" && m.focusIndex == len(m.Inputs)-1 {
-				return m, inputResultCmd(m.Inputs)
+				return m, m.inputResultCmd()
 			}
 
 			if s == "up" || s == "shift+tab" {
@@ -118,11 +118,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			return m, tea.Batch(cmds...)
 		}
-
-	case ResultMsg:
-		m.State = StateDone
-		m.Result = msg.result
-		return m, nil
 	}
 
 	// handle character input and blinking
@@ -164,14 +159,13 @@ func makeCursor(mode cursor.Mode, style lipgloss.Style) cursor.Model {
 	return c
 }
 
-func inputResultCmd(inputs []textinput.Model) tea.Cmd {
+func (m *Model) inputResultCmd() tea.Cmd {
 	return func() tea.Msg {
-		r := make(Result, len(inputs))
-		for _, i := range inputs {
-			k := i.Prompt
-			r[k] = i.Value()
+		r := make(Result, len(m.Inputs))
+		for i, input := range m.Inputs {
+			r[m.Keys[i]] = input.Value()
 		}
 
-		return ResultMsg{result: r}
+		return ResultMsg{r}
 	}
 }
