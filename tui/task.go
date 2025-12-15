@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dsrosen6/yata/models"
-	"github.com/dsrosen6/yata/tui/input"
+	"github.com/dsrosen6/yata/tui/models/input"
 )
 
 type (
