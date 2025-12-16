@@ -1,13 +1,14 @@
 package main
 
 import (
-	"context"
 	_ "embed"
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/dsrosen6/yata/models"
 	"github.com/dsrosen6/yata/sqlitedb"
 	"github.com/dsrosen6/yata/tui"
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 	_ "modernc.org/sqlite"
 )
 
@@ -21,7 +22,6 @@ func main() {
 }
 
 func run() error {
-	ctx := context.Background()
 	h, err := sqlitedb.NewHandler(schema, "./app.db")
 	if err != nil {
 		return fmt.Errorf("initializing sqlite handler: %w", err)
@@ -33,19 +33,20 @@ func run() error {
 		}
 	}()
 
-	r, err := h.InitStores(ctx)
-	if err != nil {
-		return fmt.Errorf("initializing stores: %w", err)
+	initialTasks := []*models.Task{
+		{Title: "do something"},
+		{Title: "do more things"},
+		{Title: "do even more things"},
 	}
 
-	m, err := tui.InitialModel(r, tui.Opts{})
-	if err != nil {
-		return fmt.Errorf("initializing model: %w", err)
-	}
-
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		return fmt.Errorf("running tui: %w", err)
+	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
+	flx := tview.NewFlex()
+	list := tui.NewListHandler(initialTasks)
+	box := tview.NewBox().SetTitle("summary").SetBorder(true)
+	flx.AddItem(list, 0, 2, true)
+	flx.AddItem(box, 0, 1, false)
+	if err := tview.NewApplication().SetRoot(flx, true).Run(); err != nil {
+		return fmt.Errorf("running app")
 	}
 	return nil
 }
