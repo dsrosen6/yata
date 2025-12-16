@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/dsrosen6/yata/models"
@@ -8,48 +9,57 @@ import (
 	"github.com/rivo/tview"
 )
 
-const (
-	uncheckedIcon = "󰄱"
-	checkedIcon   = "󰄵"
-)
+var app *App
 
-type ListHandler struct {
-	*tview.List
+type App struct {
+	*tview.Application
+	MainFlex *tview.Flex
+	ListFlex *tview.Flex
+	Repos    *models.AllRepos
+	List     *ListHandler
+	Tasks    []*models.Task
+
+	AddingTask bool
 }
 
-func NewListHandler(initialTasks []*models.Task) *ListHandler {
-	l := tview.NewList().
-		ShowSecondaryText(false).
-		SetSelectedBackgroundColor(tcell.ColorDefault).
-		SetSelectedTextColor(tcell.ColorBlue)
-	l.SetBorder(true)
-	l.SetTitle("tasks")
-	l.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Rune() {
-		case 'j':
-			return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
-		case 'k':
-			return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
-		}
-		return event
-	})
+func init() {
+	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
+}
 
-	for _, t := range initialTasks {
-		l.AddItem(taskToListEntry(t), "", 0, nil)
-	}
-
-	return &ListHandler{
-		List: l,
+func NewApp(repos *models.AllRepos) *App {
+	flx := tview.NewFlex()
+	return &App{
+		Application: tview.NewApplication().SetRoot(flx, true),
+		MainFlex:    flx,
+		Repos:       repos,
+		Tasks:       []*models.Task{},
 	}
 }
 
-func taskToListEntry(t *models.Task) string {
-	return fmt.Sprintf("%s %s", checkbox(t), t.Title)
+func (a *App) Init(ctx context.Context) error {
+	initialTasks, err := a.Repos.Tasks.ListAll(ctx)
+	if err != nil {
+		return fmt.Errorf("initial task fetch: %w", err)
+	}
+	a.Tasks = initialTasks
+
+	a.List = NewListHandler()
+	if err := a.List.Init(ctx); err != nil {
+		return fmt.Errorf("initializing list handler: %w", err)
+	}
+
+	a.ListFlex = newListFlex(a.List)
+	a.MainFlex.AddItem(a.ListFlex, 0, 1, true).
+		AddItem(newSummaryFlex(), 0, 1, false)
+
+	a.SetFocus(a.ListFlex)
+	return nil
 }
 
-func checkbox(t *models.Task) string {
-	if t.Complete {
-		return checkedIcon
+func Run(ctx context.Context, repos *models.AllRepos) error {
+	app = NewApp(repos)
+	if err := app.Init(ctx); err != nil {
+		return fmt.Errorf("initializing app: %w", err)
 	}
-	return uncheckedIcon
+	return app.Run()
 }
