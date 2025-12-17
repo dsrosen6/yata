@@ -30,7 +30,7 @@ func (a *app) handleTaskEntryDone(key tcell.Key) {
 		}
 	}
 	a.addingTask = false
-	a.SetFocus(a.taskList)
-	a.listFlex.RemoveItem(a.taskEntryField)
-	a.taskEntryField = a.newTaskEntryField()
+	a.SetFocus(a.mainFlex)
+	a.rootFlex.RemoveItem(a.entryFlex)
+	a.taskEntryField.SetText("")
 }

@@ -8,15 +8,15 @@ import (
 func (a *app) newListFlex(lh *tview.List) *tview.Flex {
 	f := tview.NewFlex().
 		SetDirection(tview.FlexRow).
-		AddItem(lh, 0, 2, true)
+		AddItem(lh, 0, 1, true)
 
 	f.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
 		case 'a':
 			if !a.addingTask {
 				a.addingTask = true
-				f.AddItem(a.taskEntryField, 0, 1, true)
-				a.SetFocus(a.taskEntryField)
+				a.rootFlex.AddItem(a.entryFlex, 0, 1, true)
+				a.SetFocus(a.entryFlex)
 				return nil
 			}
 		}

@@ -12,7 +12,9 @@ import (
 type app struct {
 	*tview.Application
 	repos          *models.AllRepos
+	rootFlex       *tview.Flex
 	mainFlex       *tview.Flex
+	entryFlex      *tview.Flex
 	listFlex       *tview.Flex
 	taskList       *tview.List
 	taskEntryField *tview.InputField
@@ -35,14 +37,28 @@ func Run(ctx context.Context, repos *models.AllRepos) error {
 
 func newApp(repos *models.AllRepos) *app {
 	a := &app{}
+	a.rootFlex = tview.NewFlex().SetDirection(tview.FlexRow)
 	a.mainFlex = tview.NewFlex()
 	a.taskList = a.newTaskList()
 	a.listFlex = a.newListFlex(a.taskList)
 	a.taskEntryField = a.newTaskEntryField()
+	a.entryFlex = tview.NewFlex().AddItem(a.taskEntryField, 0, 1, true)
 	a.repos = repos
-	a.Application = tview.NewApplication().SetRoot(a.mainFlex, true)
+	a.rootFlex.AddItem(a.mainFlex, 0, 8, true)
+	a.rootFlex.SetInputCapture(a.globalInputCapture)
+	a.Application = tview.NewApplication().SetRoot(a.rootFlex, true)
 
 	return a
+}
+
+func (a *app) globalInputCapture(event *tcell.EventKey) *tcell.EventKey {
+	switch event.Rune() {
+	case 'q':
+		if !a.addingTask {
+			a.Stop()
+		}
+	}
+	return event
 }
 
 func (a *app) init(ctx context.Context) error {
