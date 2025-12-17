@@ -9,57 +9,57 @@ import (
 	"github.com/rivo/tview"
 )
 
-var app *App
-
-type App struct {
+type app struct {
 	*tview.Application
-	MainFlex *tview.Flex
-	ListFlex *tview.Flex
-	Repos    *models.AllRepos
-	List     *ListHandler
-	Tasks    []*models.Task
+	repos          *models.AllRepos
+	mainFlex       *tview.Flex
+	listFlex       *tview.Flex
+	taskList       *tview.List
+	taskEntryField *tview.InputField
+	tasks          []*models.Task
 
-	AddingTask bool
+	addingTask bool
 }
 
 func init() {
 	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
 }
 
-func NewApp(repos *models.AllRepos) *App {
-	flx := tview.NewFlex()
-	return &App{
-		Application: tview.NewApplication().SetRoot(flx, true),
-		MainFlex:    flx,
-		Repos:       repos,
-		Tasks:       []*models.Task{},
+func Run(ctx context.Context, repos *models.AllRepos) error {
+	a := newApp(repos)
+	if err := a.init(ctx); err != nil {
+		return fmt.Errorf("initializing app: %w", err)
 	}
+	return a.Run()
 }
 
-func (a *App) Init(ctx context.Context) error {
-	initialTasks, err := a.Repos.Tasks.ListAll(ctx)
+func newApp(repos *models.AllRepos) *app {
+	a := &app{}
+	a.mainFlex = tview.NewFlex()
+	a.taskList = a.newTaskList()
+	a.listFlex = a.newListFlex(a.taskList)
+	a.taskEntryField = a.newTaskEntryField()
+	a.repos = repos
+	a.Application = tview.NewApplication().SetRoot(a.mainFlex, true)
+
+	return a
+}
+
+func (a *app) init(ctx context.Context) error {
+	tasks, err := a.repos.Tasks.ListAll(ctx)
 	if err != nil {
 		return fmt.Errorf("initial task fetch: %w", err)
 	}
-	a.Tasks = initialTasks
+	a.tasks = tasks
 
-	a.List = NewListHandler()
-	if err := a.List.Init(ctx); err != nil {
+	// provides an initial load of tasks into the list
+	if err := a.initTaskList(a.taskList); err != nil {
 		return fmt.Errorf("initializing list handler: %w", err)
 	}
 
-	a.ListFlex = newListFlex(a.List)
-	a.MainFlex.AddItem(a.ListFlex, 0, 1, true).
+	a.mainFlex.AddItem(a.listFlex, 0, 1, true).
 		AddItem(newSummaryFlex(), 0, 1, false)
 
-	a.SetFocus(a.ListFlex)
+	a.SetFocus(a.listFlex)
 	return nil
-}
-
-func Run(ctx context.Context, repos *models.AllRepos) error {
-	app = NewApp(repos)
-	if err := app.Init(ctx); err != nil {
-		return fmt.Errorf("initializing app: %w", err)
-	}
-	return app.Run()
 }

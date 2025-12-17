@@ -8,31 +8,29 @@ import (
 	"github.com/rivo/tview"
 )
 
-func newTaskEntryBox() *tview.InputField {
-	f := tview.NewInputField().
-		SetLabel("Title: ").
-		SetFieldBackgroundColor(tcell.ColorDefault)
-	f.SetBorder(true)
+func (a *app) newTaskEntryField() *tview.InputField {
+	t := tview.NewInputField().SetLabel("Title: ")
+	setDefaultInputColors(t)
+	t.SetBorder(true)
+	t.SetDoneFunc(a.handleTaskEntryDone)
 
-	f.SetDoneFunc(func(key tcell.Key) {
+	return t
+}
+
+func (a *app) handleTaskEntryDone(key tcell.Key) {
+	if key == tcell.KeyEnter {
 		ctx := context.Background()
-		title := f.GetText()
+		title := a.taskEntryField.GetText()
 		task := &models.Task{
 			Title: title,
 		}
 
-		if _, err := app.addTask(ctx, task); err != nil {
+		if err := a.addTask(ctx, task); err != nil {
 			return // TODO: do something
 		}
-
-		if err := app.refreshTasks(ctx); err != nil {
-			return // TODO: do something
-		}
-
-		app.AddingTask = false
-		app.SetFocus(app.ListFlex)
-		app.ListFlex.RemoveItem(f)
-	})
-
-	return f
+	}
+	a.addingTask = false
+	a.SetFocus(a.taskList)
+	a.listFlex.RemoveItem(a.taskEntryField)
+	a.taskEntryField = a.newTaskEntryField()
 }

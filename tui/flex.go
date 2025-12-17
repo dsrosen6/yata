@@ -5,7 +5,7 @@ import (
 	"github.com/rivo/tview"
 )
 
-func newListFlex(lh *ListHandler) *tview.Flex {
+func (a *app) newListFlex(lh *tview.List) *tview.Flex {
 	f := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(lh, 0, 2, true)
@@ -13,11 +13,10 @@ func newListFlex(lh *ListHandler) *tview.Flex {
 	f.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
 		case 'a':
-			if !app.AddingTask {
-				app.AddingTask = true
-				i := newTaskEntryBox()
-				f.AddItem(i, 0, 1, true)
-				app.SetFocus(i)
+			if !a.addingTask {
+				a.addingTask = true
+				f.AddItem(a.taskEntryField, 0, 1, true)
+				a.SetFocus(a.taskEntryField)
 				return nil
 			}
 		}

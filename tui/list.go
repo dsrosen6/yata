@@ -14,15 +14,10 @@ const (
 	checkedIcon   = "󰄵"
 )
 
-type ListHandler struct {
-	*tview.List
-}
-
-func NewListHandler() *ListHandler {
+func (a *app) newTaskList() *tview.List {
 	l := tview.NewList().
-		ShowSecondaryText(false).
-		SetSelectedBackgroundColor(tcell.ColorDefault).
-		SetSelectedTextColor(tcell.ColorBlue)
+		ShowSecondaryText(false)
+	setDefaultListColors(l)
 	l.SetBorder(true)
 	l.SetTitle("tasks")
 	l.SetTitleAlign(tview.AlignLeft)
@@ -33,20 +28,20 @@ func NewListHandler() *ListHandler {
 		case 'k':
 			return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
 		case 'd':
-			if len(app.Tasks) == 0 {
+			if len(a.tasks) == 0 {
 				return event
 			}
-			sel := app.Tasks[l.GetCurrentItem()]
-			if err := app.deleteTask(context.Background(), sel.ID); err != nil {
+			sel := a.tasks[l.GetCurrentItem()]
+			if err := a.deleteTask(context.Background(), sel.ID); err != nil {
 				// TODO: handle this
 				return event
 			}
 		case ' ':
 			// check or uncheck
-			sel := app.Tasks[l.GetCurrentItem()]
+			sel := a.tasks[l.GetCurrentItem()]
 			t := *sel
 			t.Complete = !t.Complete
-			if err := app.updateTask(context.Background(), &t); err != nil {
+			if err := a.updateTask(context.Background(), &t); err != nil {
 				// TODO: handle this
 				return event
 			}
@@ -54,26 +49,24 @@ func NewListHandler() *ListHandler {
 		return event
 	})
 
-	return &ListHandler{
-		List: l,
-	}
+	return l
 }
 
-func (lh *ListHandler) Init(ctx context.Context) error {
-	if err := lh.RefreshTasks(ctx); err != nil {
+func (a *app) initTaskList(lh *tview.List) error {
+	if err := a.refreshListTasks(lh); err != nil {
 		return fmt.Errorf("refreshing tasks: %w", err)
 	}
 
 	return nil
 }
 
-func (lh *ListHandler) RefreshTasks(ctx context.Context) error {
+func (a *app) refreshListTasks(lh *tview.List) error {
 	sel := lh.GetCurrentItem()
 	lh.Clear()
-	for _, t := range app.Tasks {
+	for _, t := range a.tasks {
 		lh.AddItem(taskToListEntry(t), "", 0, nil)
 	}
-	if len(app.Tasks) != 0 {
+	if len(a.tasks) != 0 {
 		lh.SetCurrentItem(sel)
 	}
 
