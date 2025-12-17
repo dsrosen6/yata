@@ -17,9 +17,17 @@ const (
 func (a *app) newTaskList() *tview.List {
 	l := tview.NewList().
 		ShowSecondaryText(false)
-	setDefaultListColors(l)
+	setListColors(a.cfg, l)
 	l.SetBorder(true)
 	l.SetTitle("tasks")
+	l.SetFocusFunc(func() {
+		l.SetTitleColor(a.cfg.MainColor)
+		l.SetBorderColor(a.cfg.MainColor)
+	})
+	l.SetBlurFunc(func() {
+		l.SetTitleColor(a.cfg.SecondaryColor)
+		l.SetBorderColor(a.cfg.SecondaryColor)
+	})
 	l.SetTitleAlign(tview.AlignLeft)
 	l.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {

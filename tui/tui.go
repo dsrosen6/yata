@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dsrosen6/yata/config"
 	"github.com/dsrosen6/yata/models"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -11,6 +12,7 @@ import (
 
 type app struct {
 	*tview.Application
+	cfg            *config.Config
 	repos          *models.AllRepos
 	rootFlex       *tview.Flex
 	mainFlex       *tview.Flex
@@ -27,16 +29,17 @@ func init() {
 	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
 }
 
-func Run(ctx context.Context, repos *models.AllRepos) error {
-	a := newApp(repos)
+func Run(ctx context.Context, cfg *config.Config, repos *models.AllRepos) error {
+	a := newApp(cfg, repos)
 	if err := a.init(ctx); err != nil {
 		return fmt.Errorf("initializing app: %w", err)
 	}
 	return a.Run()
 }
 
-func newApp(repos *models.AllRepos) *app {
+func newApp(cfg *config.Config, repos *models.AllRepos) *app {
 	a := &app{}
+	a.cfg = cfg
 	a.rootFlex = tview.NewFlex().SetDirection(tview.FlexRow)
 	a.mainFlex = tview.NewFlex()
 	a.taskList = a.newTaskList()

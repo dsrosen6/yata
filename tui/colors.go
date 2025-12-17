@@ -1,16 +1,18 @@
 package tui
 
 import (
+	"github.com/dsrosen6/yata/config"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
-func setDefaultInputColors(f *tview.InputField) {
+func setInputColors(cfg *config.Config, f *tview.InputField) {
 	f.SetFieldBackgroundColor(tcell.ColorDefault)
-	f.SetLabelColor(tcell.ColorBlue)
+	f.SetLabelColor(cfg.MainColor)
+	f.SetBorderColor(cfg.MainColor)
 }
 
-func setDefaultListColors(l *tview.List) {
+func setListColors(cfg *config.Config, l *tview.List) {
 	l.SetSelectedBackgroundColor(tcell.ColorDefault)
-	l.SetSelectedTextColor(tcell.ColorBlue)
+	l.SetSelectedTextColor(cfg.MainColor)
 }

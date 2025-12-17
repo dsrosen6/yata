@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/dsrosen6/yata/config"
 	"github.com/dsrosen6/yata/sqlitedb"
 	"github.com/dsrosen6/yata/tui"
 	_ "modernc.org/sqlite"
@@ -21,6 +22,11 @@ func main() {
 
 func run() error {
 	ctx := context.Background()
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
 	d, err := sqlitedb.NewHandler(schema, "./app.db")
 	if err != nil {
 		return fmt.Errorf("initializing sqlite handler: %w", err)
@@ -37,5 +43,5 @@ func run() error {
 		return fmt.Errorf("initializing repositories: %w", err)
 	}
 
-	return tui.Run(ctx, repos)
+	return tui.Run(ctx, cfg, repos)
 }

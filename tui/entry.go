@@ -10,7 +10,7 @@ import (
 
 func (a *app) newTaskEntryField() *tview.InputField {
 	t := tview.NewInputField().SetLabel("Title: ")
-	setDefaultInputColors(t)
+	setInputColors(a.cfg, t)
 	t.SetBorder(true)
 	t.SetDoneFunc(a.handleTaskEntryDone)
 
