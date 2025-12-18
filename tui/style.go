@@ -15,14 +15,12 @@ type styles struct {
 }
 
 func generateStyles(cfg *config.Config) styles {
-	baseFocused := lipgloss.NewStyle().Foreground(cfg.MainColor)
-	baseUnfocused := lipgloss.NewStyle().Foreground(cfg.SecondaryColor)
 	return styles{
-		focusedBoxStyle:        baseFocused.Border(lipgloss.DoubleBorder()).BorderForeground(cfg.MainColor),
-		focusedBoxTitleStyle:   baseFocused,
-		focusedTaskStyle:       baseFocused,
-		unfocusedBoxStyle:      baseUnfocused.Border(lipgloss.NormalBorder()).BorderForeground(cfg.SecondaryColor),
-		unfocusedBoxTitleStyle: baseUnfocused,
-		unfocusedTaskStyle:     baseUnfocused,
+		focusedBoxStyle:        lipgloss.NewStyle().Border(cfg.Focused.BorderType).BorderForeground(cfg.Focused.BorderColor).Foreground(cfg.Focused.TextColor),
+		focusedBoxTitleStyle:   lipgloss.NewStyle().Foreground(cfg.Focused.BoxTitleColor),
+		focusedTaskStyle:       lipgloss.NewStyle().Foreground(cfg.Focused.TextColor),
+		unfocusedBoxStyle:      lipgloss.NewStyle().Border(cfg.Unfocused.BorderType).BorderForeground(cfg.Unfocused.BorderColor),
+		unfocusedBoxTitleStyle: lipgloss.NewStyle().Foreground(cfg.Unfocused.BoxTitleColor),
+		unfocusedTaskStyle:     lipgloss.NewStyle().Foreground(cfg.Unfocused.TextColor),
 	}
 }

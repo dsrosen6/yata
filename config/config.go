@@ -6,24 +6,65 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
 type ConfigIn struct {
-	MainColor      *uint `json:"main_color"`
-	SecondaryColor *uint `json:"secondary_color"`
+	Focused struct {
+		BorderColor   *uint   `json:"border_color"`
+		TextColor     *uint   `json:"text_color"`
+		BoxTitleColor *uint   `json:"box_title_color"`
+		BorderType    *string `json:"border_type"`
+	} `json:"focused"`
+
+	Unfocused struct {
+		BorderColor   *uint   `json:"border_color"`
+		TextColor     *uint   `json:"text_color"`
+		BoxTitleColor *uint   `json:"box_title_color"`
+		BorderType    *string `json:"border_type"`
+	} `json:"unfocused"`
 }
 
 type Config struct {
-	MainColor      lipgloss.ANSIColor
-	SecondaryColor lipgloss.ANSIColor
+	Focused   FocusedOpts
+	Unfocused UnfocusedOpts
 }
 
-var defaultConfig = Config{
-	MainColor:      lipgloss.ANSIColor(4),
-	SecondaryColor: lipgloss.ANSIColor(7),
+type FocusedOpts struct {
+	BorderColor   lipgloss.ANSIColor
+	TextColor     lipgloss.ANSIColor
+	BoxTitleColor lipgloss.ANSIColor
+	BorderType    lipgloss.Border
 }
+
+type UnfocusedOpts struct {
+	BorderColor   lipgloss.ANSIColor
+	TextColor     lipgloss.ANSIColor
+	BoxTitleColor lipgloss.ANSIColor
+	BorderType    lipgloss.Border
+}
+
+var (
+	defaultFocusedColor   = lipgloss.ANSIColor(4)
+	defaultUnfocusedColor = lipgloss.ANSIColor(7)
+
+	defaultConfig = Config{
+		Focused: FocusedOpts{
+			BorderColor:   defaultFocusedColor,
+			TextColor:     defaultFocusedColor,
+			BoxTitleColor: defaultFocusedColor,
+			BorderType:    lipgloss.DoubleBorder(),
+		},
+		Unfocused: UnfocusedOpts{
+			BorderColor:   defaultUnfocusedColor,
+			TextColor:     defaultUnfocusedColor,
+			BoxTitleColor: defaultUnfocusedColor,
+			BorderType:    lipgloss.NormalBorder(),
+		},
+	}
+)
 
 const (
 	cfgDirName  = "yata"
@@ -45,20 +86,24 @@ func GetConfig() (*Config, error) {
 }
 
 func configInToConfig(in *ConfigIn) *Config {
-	cfg := defaultConfig
+	dc := defaultConfig
 	if in == nil {
-		return &cfg
+		return &dc
 	}
-
-	if in.MainColor != nil {
-		cfg.MainColor = lipgloss.ANSIColor(*in.MainColor)
+	return &Config{
+		Focused: FocusedOpts{
+			BorderColor:   uintPtrToColor(in.Focused.BorderColor, dc.Focused.BorderColor),
+			TextColor:     uintPtrToColor(in.Focused.TextColor, dc.Focused.TextColor),
+			BoxTitleColor: uintPtrToColor(in.Focused.BoxTitleColor, dc.Focused.BoxTitleColor),
+			BorderType:    strPtrToBorder(in.Focused.BorderType, dc.Focused.BorderType),
+		},
+		Unfocused: UnfocusedOpts{
+			BorderColor:   uintPtrToColor(in.Unfocused.BorderColor, dc.Unfocused.BorderColor),
+			TextColor:     uintPtrToColor(in.Unfocused.TextColor, dc.Unfocused.TextColor),
+			BoxTitleColor: uintPtrToColor(in.Unfocused.BoxTitleColor, dc.Unfocused.BoxTitleColor),
+			BorderType:    strPtrToBorder(in.Unfocused.BorderType, dc.Unfocused.BorderType),
+		},
 	}
-
-	if in.SecondaryColor != nil {
-		cfg.SecondaryColor = lipgloss.ANSIColor(*in.SecondaryColor)
-	}
-
-	return &cfg
 }
 
 func readConfig(path string) (*ConfigIn, error) {
@@ -80,4 +125,31 @@ func readConfig(path string) (*ConfigIn, error) {
 	}
 
 	return cfg, nil
+}
+
+func uintPtrToColor(i *uint, defColor lipgloss.ANSIColor) lipgloss.ANSIColor {
+	if i != nil && *i <= 255 {
+		return lipgloss.ANSIColor(*i)
+	}
+
+	return defColor
+}
+
+func strPtrToBorder(s *string, defBorder lipgloss.Border) lipgloss.Border {
+	if s == nil {
+		return defBorder
+	}
+
+	switch strings.ToLower(*s) {
+	case "normal":
+		return lipgloss.NormalBorder()
+	case "double":
+		return lipgloss.DoubleBorder()
+	case "rounded", "round":
+		return lipgloss.RoundedBorder()
+	case "thick", "thicc":
+		return lipgloss.ThickBorder()
+	default:
+		return defBorder
+	}
 }
