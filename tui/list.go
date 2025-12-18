@@ -3,91 +3,248 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
+	fbox "github.com/dsrosen6/tea-flexbox"
+	"github.com/dsrosen6/tea-flexbox/titlebox"
 	"github.com/dsrosen6/yata/models"
-	"github.com/gdamore/tcell/v2"
-	"github.com/rivo/tview"
+	"github.com/dsrosen6/yata/tui/models/form"
+)
+
+type (
+	todoListModel struct {
+		stores *models.AllRepos
+		tasks  []*models.Task
+
+		cursor    int
+		taskMode  taskMode
+		entryForm form.Model
+		selected  map[int]struct{}
+
+		pendingAdd bool
+		dimensions
+		styles
+	}
+
+	storeErrorMsg     struct{ error }
+	refreshTasksMsg   struct{}
+	tasksRefreshedMsg struct{ tasks []*models.Task }
+
+	taskMode int
 )
 
 const (
-	uncheckedIcon = "󰄱"
-	checkedIcon   = "󰄵"
+	taskModeViewing taskMode = iota
+	taskModeCreating
 )
 
-func (a *app) newTaskList() *tview.List {
-	l := tview.NewList().
-		ShowSecondaryText(false)
-	setListColors(a.cfg, l)
-	l.SetBorder(true)
-	l.SetTitle("tasks")
-	l.SetFocusFunc(func() {
-		l.SetTitleColor(a.cfg.MainColor)
-		l.SetBorderColor(a.cfg.MainColor)
-	})
-	l.SetBlurFunc(func() {
-		l.SetTitleColor(a.cfg.SecondaryColor)
-		l.SetBorderColor(a.cfg.SecondaryColor)
-	})
-	l.SetTitleAlign(tview.AlignLeft)
-	l.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Rune() {
-		case 'j':
-			return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
-		case 'k':
-			return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
-		case 'd':
-			if len(a.tasks) == 0 {
-				return event
-			}
-			sel := a.tasks[l.GetCurrentItem()]
-			if err := a.deleteTask(context.Background(), sel.ID); err != nil {
-				// TODO: handle this
-				return event
-			}
-		case ' ':
-			// check or uncheck
-			sel := a.tasks[l.GetCurrentItem()]
-			t := *sel
-			t.Complete = !t.Complete
-			if err := a.updateTask(context.Background(), &t); err != nil {
-				// TODO: handle this
-				return event
-			}
+func initialTodoList(s styles, stores *models.AllRepos) todoListModel {
+	return todoListModel{
+		styles:   s,
+		stores:   stores,
+		tasks:    []*models.Task{},
+		selected: make(map[int]struct{}),
+	}
+}
+
+func (m todoListModel) Init() tea.Cmd {
+	return m.refreshTasks()
+}
+
+func (m todoListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
 		}
-		return event
-	})
-
-	return l
-}
-
-func (a *app) initTaskList(lh *tview.List) error {
-	if err := a.refreshListTasks(lh); err != nil {
-		return fmt.Errorf("refreshing tasks: %w", err)
 	}
 
-	return nil
+	switch m.taskMode {
+	case taskModeViewing:
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "up", "k":
+				m.cursor = cursorUp(m.cursor, len(m.tasks)-1)
+			case "down", "j":
+				m.cursor = cursorDown(m.cursor, len(m.tasks)-1)
+			case "enter", " ":
+				if len(m.tasks) > 0 {
+					return m, m.toggleTaskComplete(m.tasks[m.cursor])
+				}
+			case "d":
+				if len(m.tasks) > 0 {
+					return m, m.deleteTask(m.tasks[m.cursor].ID)
+				}
+			case "a":
+				m.taskMode = taskModeCreating
+				m.pendingAdd = true
+				m.entryForm, _ = newTaskEntryForm(m.styles)
+				return m, m.entryForm.Init()
+			}
+		case refreshTasksMsg:
+			return m, m.refreshTasks()
+		case tasksRefreshedMsg:
+			m.tasks = msg.tasks
+			if len(m.tasks) == 0 {
+				m.cursor = 0
+			} else if m.pendingAdd {
+				m.cursor = len(m.tasks) - 1
+			} else if m.cursor >= len(m.tasks) {
+				m.cursor = len(m.tasks) - 1
+			}
+
+			m.pendingAdd = false
+			return m, nil
+		}
+	case taskModeCreating:
+		f, cmd := m.entryForm.Update(msg)
+		m.entryForm = f.(form.Model)
+
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "esc":
+				m.taskMode = taskModeViewing
+				m.entryForm, _ = newTaskEntryForm(m.styles)
+				m.pendingAdd = false
+				return m, nil
+			}
+		case form.ResultMsg:
+			m.taskMode = taskModeViewing
+			t := taskFromInputResult(msg.Result)
+			return m, m.insertTask(t)
+		}
+		return m, cmd
+	}
+
+	return m, nil
 }
 
-func (a *app) refreshListTasks(lh *tview.List) error {
-	sel := lh.GetCurrentItem()
-	lh.Clear()
-	for _, t := range a.tasks {
-		lh.AddItem(taskToListEntry(t), "", 0, nil)
-	}
-	if len(a.tasks) != 0 {
-		lh.SetCurrentItem(sel)
+func (m todoListModel) View() string {
+	if m.width == 0 || m.height == 0 {
+		return "Initializing..."
 	}
 
-	return nil
+	fl := fbox.New(fbox.Vertical, 1).
+		AddTitleBox(m.createTasksBox(), 3, nil).
+		AddStyleBox(m.focusedBoxStyle, m.entryForm.View(), 1, func() bool { return m.taskMode == taskModeCreating })
+
+	return fl.Render(m.width, m.height)
 }
 
-func taskToListEntry(t *models.Task) string {
-	return fmt.Sprintf("%s %s", checkbox(t), t.Title)
+func (m todoListModel) createTasksBox() titlebox.Box {
+	boxStyle := m.focusedBoxStyle
+	titleStyle := m.focusedBoxTitleStyle
+	if m.taskMode == taskModeCreating {
+		boxStyle = m.unfocusedBoxStyle
+		titleStyle = m.unfocusedBoxTitleStyle
+	}
+
+	return titlebox.New().
+		SetTitle("tasks").
+		SetBody(m.tasksOutput()).
+		SetTitleAlignment(titlebox.AlignLeft).
+		SetBoxStyle(boxStyle.Padding(0, 1)).
+		SetTitleStyle(titleStyle)
 }
 
-func checkbox(t *models.Task) string {
-	if t.Complete {
-		return checkedIcon
+func (m todoListModel) tasksOutput() string {
+	if len(m.tasks) == 0 && m.taskMode != taskModeCreating && !m.pendingAdd {
+		return "No tasks found\n"
 	}
-	return uncheckedIcon
+
+	uncheckedIcon := "󰄱"
+	checkedIcon := "󰄵"
+	var b strings.Builder
+	for i, t := range m.tasks {
+		checked := uncheckedIcon
+		if t.Complete {
+			checked = checkedIcon
+		}
+
+		s := fmt.Sprintf("%s %s", checked, t.Title)
+		if m.cursor == i && m.taskMode != taskModeCreating {
+			b.WriteString(m.focusedTaskStyle.Render(s))
+		} else {
+			b.WriteString(m.unfocusedTaskStyle.Render(s))
+		}
+		b.WriteRune('\n')
+	}
+
+	return b.String()
+}
+
+func (m todoListModel) refreshTasks() tea.Cmd {
+	return func() tea.Msg {
+		tasks, err := m.stores.Tasks.ListAll(context.Background())
+		if err != nil {
+			return storeErrorMsg{err}
+		}
+
+		return tasksRefreshedMsg{tasks: tasks}
+	}
+}
+
+func (m todoListModel) insertTask(t *models.Task) tea.Cmd {
+	return func() tea.Msg {
+		if _, err := m.stores.Tasks.Create(context.Background(), t); err != nil {
+			return storeErrorMsg{err}
+		}
+
+		return refreshTasksMsg{}
+	}
+}
+
+func (m todoListModel) deleteTask(id int64) tea.Cmd {
+	return func() tea.Msg {
+		if err := m.stores.Tasks.Delete(context.Background(), id); err != nil {
+			return storeErrorMsg{err}
+		}
+
+		return refreshTasksMsg{}
+	}
+}
+
+func (m todoListModel) toggleTaskComplete(t *models.Task) tea.Cmd {
+	return func() tea.Msg {
+		t.Complete = !t.Complete
+		if _, err := m.stores.Tasks.Update(context.Background(), t); err != nil {
+			return storeErrorMsg{err}
+		}
+
+		return refreshTasksMsg{}
+	}
+}
+
+func newTaskEntryForm(s styles) (form.Model, error) {
+	o := &form.Opts{
+		FieldKeys:        []string{"Title"},
+		PromptIfOneField: false,
+		FocusedStyle:     s.focusedTaskStyle,
+		UnfocusedStyle:   s.unfocusedTaskStyle,
+	}
+
+	f, err := form.InitialInputModel(o)
+	if err != nil {
+		return form.Model{}, fmt.Errorf("creating model: %w", err)
+	}
+
+	return f, nil
+}
+
+func taskFromInputResult(r form.Result) *models.Task {
+	t, ok := r["Title"]
+	if !ok {
+		return nil
+	}
+
+	return &models.Task{
+		Title: t,
+	}
 }

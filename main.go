@@ -38,10 +38,10 @@ func run() error {
 		}
 	}()
 
-	repos, err := d.InitStores(ctx)
+	stores, err := d.InitStores(ctx)
 	if err != nil {
 		return fmt.Errorf("initializing repositories: %w", err)
 	}
 
-	return tui.Run(ctx, cfg, repos)
+	return tui.Run(cfg, stores)
 }
