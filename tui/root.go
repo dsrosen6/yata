@@ -19,7 +19,7 @@ type dimensions struct {
 }
 
 func Run(cfg *config.Config, stores *models.AllRepos) error {
-	m := initialTodoList(generateStyles(cfg), stores)
+	m := newModel(cfg, stores)
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		return err
 	}
@@ -48,11 +48,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		}
 	}
 
 	var todoModel tea.Model
