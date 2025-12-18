@@ -7,22 +7,22 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gdamore/tcell/v2"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type ConfigIn struct {
-	MainColor      *int `json:"main_color"`
-	SecondaryColor *int `json:"secondary_color"`
+	MainColor      *uint `json:"main_color"`
+	SecondaryColor *uint `json:"secondary_color"`
 }
 
 type Config struct {
-	MainColor      tcell.Color
-	SecondaryColor tcell.Color
+	MainColor      lipgloss.ANSIColor
+	SecondaryColor lipgloss.ANSIColor
 }
 
 var defaultConfig = Config{
-	MainColor:      tcell.ColorBlue,
-	SecondaryColor: tcell.ColorDefault,
+	MainColor:      lipgloss.ANSIColor(4),
+	SecondaryColor: lipgloss.ANSIColor(7),
 }
 
 const (
@@ -51,17 +51,11 @@ func configInToConfig(in *ConfigIn) *Config {
 	}
 
 	if in.MainColor != nil {
-		c := tcell.PaletteColor(*in.MainColor)
-		if c.Valid() {
-			cfg.MainColor = c
-		}
+		cfg.MainColor = lipgloss.ANSIColor(*in.MainColor)
 	}
 
 	if in.SecondaryColor != nil {
-		c := tcell.PaletteColor(*in.SecondaryColor)
-		if c.Valid() {
-			cfg.SecondaryColor = c
-		}
+		cfg.SecondaryColor = lipgloss.ANSIColor(*in.SecondaryColor)
 	}
 
 	return &cfg
