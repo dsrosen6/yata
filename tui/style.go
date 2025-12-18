@@ -2,18 +2,27 @@ package tui
 
 import (
 	"github.com/charmbracelet/lipgloss"
-	"github.com/dsrosen6/tea-flexbox/titlebox"
 	"github.com/dsrosen6/yata/config"
 )
 
-func mainStyle(cfg *config.Config) lipgloss.Style {
-	return lipgloss.NewStyle().
-		Border(lipgloss.ThickBorder()).
-		BorderForeground(cfg.MainColor).
-		Foreground(cfg.MainColor).
-		Align(lipgloss.Center, lipgloss.Center)
+type styles struct {
+	focusedBoxStyle        lipgloss.Style
+	focusedBoxTitleStyle   lipgloss.Style
+	focusedTaskStyle       lipgloss.Style
+	unfocusedBoxStyle      lipgloss.Style
+	unfocusedBoxTitleStyle lipgloss.Style
+	unfocusedTaskStyle     lipgloss.Style
 }
 
-func boxTitleStyle(cfg *config.Config) lipgloss.Style {
-	return titlebox.DefaultTitleStyle.Foreground(cfg.MainColor)
+func generateStyles(cfg *config.Config) styles {
+	baseFocused := lipgloss.NewStyle().Foreground(cfg.MainColor)
+	baseUnfocused := lipgloss.NewStyle().Foreground(cfg.SecondaryColor)
+	return styles{
+		focusedBoxStyle:        baseFocused.Border(lipgloss.DoubleBorder()).BorderForeground(cfg.MainColor),
+		focusedBoxTitleStyle:   baseFocused,
+		focusedTaskStyle:       baseFocused,
+		unfocusedBoxStyle:      baseUnfocused.Border(lipgloss.NormalBorder()).BorderForeground(cfg.SecondaryColor),
+		unfocusedBoxTitleStyle: baseUnfocused,
+		unfocusedTaskStyle:     baseUnfocused,
+	}
 }

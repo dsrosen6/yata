@@ -2,23 +2,16 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	fbox "github.com/dsrosen6/tea-flexbox"
-	"github.com/dsrosen6/tea-flexbox/titlebox"
 	"github.com/dsrosen6/yata/config"
 	"github.com/dsrosen6/yata/models"
 )
 
 type model struct {
-	cfg    *config.Config
-	stores *models.AllRepos
+	cfg       *config.Config
+	stores    *models.AllRepos
+	todoModel todoListModel
 	dimensions
 	styles
-}
-
-type styles struct {
-	mainStyle  lipgloss.Style
-	titleStyle lipgloss.Style
 }
 
 type dimensions struct {
@@ -26,7 +19,7 @@ type dimensions struct {
 }
 
 func Run(cfg *config.Config, stores *models.AllRepos) error {
-	m := newModel(cfg, stores)
+	m := initialTodoList(generateStyles(cfg), stores)
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		return err
 	}
@@ -35,21 +28,22 @@ func Run(cfg *config.Config, stores *models.AllRepos) error {
 }
 
 func newModel(cfg *config.Config, stores *models.AllRepos) model {
+	s := generateStyles(cfg)
 	return model{
-		cfg:    cfg,
-		stores: stores,
-		styles: styles{
-			mainStyle:  mainStyle(cfg),
-			titleStyle: boxTitleStyle(cfg),
-		},
+		cfg:       cfg,
+		stores:    stores,
+		todoModel: initialTodoList(s, stores),
+		styles:    s,
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return m.todoModel.Init()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -61,37 +55,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, nil
+	var todoModel tea.Model
+	todoModel, cmd = m.todoModel.Update(msg)
+	m.todoModel = todoModel.(todoListModel)
+
+	return m, cmd
 }
 
 func (m model) View() string {
-	if m.width == 0 || m.height == 0 {
-		return ""
-	}
-
-	return m.makeRootBox().Render(m.width, m.height)
-}
-
-func (m model) makeRootBox() fbox.Box {
-	return fbox.NewBox(fbox.Horizontal, 1).
-		AddItem(fbox.FlexBoxToItem(m.makeLeftBox(), 1)).
-		AddItem(fbox.FlexBoxToItem(m.makeRightBox(), 1))
-}
-
-func (m model) makeLeftBox() fbox.Box {
-	top := titlebox.New().
-		SetTitle("tasks").
-		SetBody("tasks will be here").
-		SetTitleAlignment(titlebox.AlignLeft).
-		SetBoxStyle(m.mainStyle).
-		SetTitleStyle(m.titleStyle)
-
-	return fbox.NewBox(fbox.Vertical, 1).
-		AddItem(fbox.TitleBoxToItem(top, 1)).
-		AddItem(fbox.StyleToItem(m.mainStyle, "placeholder", 1))
-}
-
-func (m model) makeRightBox() fbox.Box {
-	return fbox.NewBox(fbox.Vertical, 1).
-		AddItem(fbox.StyleToItem(m.mainStyle, "another placeholder", 1))
+	return m.todoModel.View()
 }
