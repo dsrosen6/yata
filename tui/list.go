@@ -17,10 +17,11 @@ type (
 		stores *models.AllRepos
 		tasks  []*models.Task
 
-		cursor    int
-		taskMode  taskMode
-		entryForm *form.Model
-		selected  map[int]struct{}
+		cursor     int
+		taskMode   taskMode
+		entryForm  *form.Model
+		sortParams *models.SortParams
+		selected   map[int]struct{}
 
 		pendingAdd bool
 		dimensions
@@ -46,11 +47,12 @@ func initialTodoList(s styles, stores *models.AllRepos) (*todoListModel, error) 
 	}
 
 	return &todoListModel{
-		styles:    s,
-		stores:    stores,
-		entryForm: entry,
-		tasks:     []*models.Task{},
-		selected:  make(map[int]struct{}),
+		styles:     s,
+		stores:     stores,
+		entryForm:  entry,
+		sortParams: &models.SortParams{SortBy: models.SortByComplete},
+		tasks:      []*models.Task{},
+		selected:   make(map[int]struct{}),
 	}, nil
 }
 
@@ -196,7 +198,7 @@ func (m *todoListModel) refreshTasks() tea.Cmd {
 		if err != nil {
 			return storeErrorMsg{err}
 		}
-
+		models.SortTasks(tasks, *m.sortParams)
 		return tasksRefreshedMsg{tasks: tasks}
 	}
 }
