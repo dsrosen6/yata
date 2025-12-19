@@ -19,7 +19,7 @@ type (
 
 		cursor    int
 		taskMode  taskMode
-		entryForm form.Model
+		entryForm *form.Model
 		selected  map[int]struct{}
 
 		pendingAdd bool
@@ -39,20 +39,26 @@ const (
 	taskModeCreating
 )
 
-func initialTodoList(s styles, stores *models.AllRepos) todoListModel {
-	return todoListModel{
-		styles:   s,
-		stores:   stores,
-		tasks:    []*models.Task{},
-		selected: make(map[int]struct{}),
+func initialTodoList(s styles, stores *models.AllRepos) (*todoListModel, error) {
+	entry, err := newTaskEntryForm(s)
+	if err != nil {
+		return nil, fmt.Errorf("creating task entry form: %w", err)
 	}
+
+	return &todoListModel{
+		styles:    s,
+		stores:    stores,
+		entryForm: entry,
+		tasks:     []*models.Task{},
+		selected:  make(map[int]struct{}),
+	}, nil
 }
 
-func (m todoListModel) Init() tea.Cmd {
-	return m.refreshTasks()
+func (m *todoListModel) Init() tea.Cmd {
+	return tea.Batch(m.refreshTasks(), m.entryForm.Init())
 }
 
-func (m todoListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *todoListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -81,8 +87,6 @@ func (m todoListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "a":
 				m.taskMode = taskModeCreating
 				m.pendingAdd = true
-				m.entryForm, _ = newTaskEntryForm(m.styles)
-				return m, m.entryForm.Init()
 			}
 		case refreshTasksMsg:
 			return m, m.refreshTasks()
@@ -99,18 +103,18 @@ func (m todoListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.pendingAdd = false
 			return m, nil
 		}
+
 	case taskModeCreating:
 		f, cmd := m.entryForm.Update(msg)
-		m.entryForm = f.(form.Model)
+		m.entryForm = f.(*form.Model)
 
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "esc":
 				m.taskMode = taskModeViewing
-				m.entryForm, _ = newTaskEntryForm(m.styles)
 				m.pendingAdd = false
-				return m, nil
+				return m, m.entryForm.Reset()
 			}
 		case form.ResultMsg:
 			m.taskMode = taskModeViewing
@@ -123,7 +127,7 @@ func (m todoListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m todoListModel) View() string {
+func (m *todoListModel) View() string {
 	if m.width == 0 || m.height == 0 {
 		return "Initializing..."
 	}
@@ -135,7 +139,7 @@ func (m todoListModel) View() string {
 	return fl.Render(m.width, m.height)
 }
 
-func (m todoListModel) createTasksBox() titlebox.Box {
+func (m *todoListModel) createTasksBox() titlebox.Box {
 	boxStyle := m.focusedBoxStyle
 	titleStyle := m.focusedBoxTitleStyle
 	if m.taskMode == taskModeCreating {
@@ -151,7 +155,7 @@ func (m todoListModel) createTasksBox() titlebox.Box {
 		SetTitleStyle(titleStyle)
 }
 
-func (m todoListModel) createEntryBox() titlebox.Box {
+func (m *todoListModel) createEntryBox() titlebox.Box {
 	return titlebox.New().
 		SetTitle("new task").
 		SetBody(m.entryForm.View()).
@@ -160,7 +164,7 @@ func (m todoListModel) createEntryBox() titlebox.Box {
 		SetTitleStyle(m.focusedBoxTitleStyle)
 }
 
-func (m todoListModel) tasksOutput() string {
+func (m *todoListModel) tasksOutput() string {
 	if len(m.tasks) == 0 && m.taskMode != taskModeCreating && !m.pendingAdd {
 		return "No tasks found\n"
 	}
@@ -186,7 +190,7 @@ func (m todoListModel) tasksOutput() string {
 	return b.String()
 }
 
-func (m todoListModel) refreshTasks() tea.Cmd {
+func (m *todoListModel) refreshTasks() tea.Cmd {
 	return func() tea.Msg {
 		tasks, err := m.stores.Tasks.ListAll(context.Background())
 		if err != nil {
@@ -197,17 +201,17 @@ func (m todoListModel) refreshTasks() tea.Cmd {
 	}
 }
 
-func (m todoListModel) insertTask(t *models.Task) tea.Cmd {
+func (m *todoListModel) insertTask(t *models.Task) tea.Cmd {
 	return func() tea.Msg {
 		if _, err := m.stores.Tasks.Create(context.Background(), t); err != nil {
 			return storeErrorMsg{err}
 		}
 
-		return refreshTasksMsg{}
+		return tea.BatchMsg{m.refreshTasks(), m.entryForm.Reset()}
 	}
 }
 
-func (m todoListModel) deleteTask(id int64) tea.Cmd {
+func (m *todoListModel) deleteTask(id int64) tea.Cmd {
 	return func() tea.Msg {
 		if err := m.stores.Tasks.Delete(context.Background(), id); err != nil {
 			return storeErrorMsg{err}
@@ -217,7 +221,7 @@ func (m todoListModel) deleteTask(id int64) tea.Cmd {
 	}
 }
 
-func (m todoListModel) toggleTaskComplete(t *models.Task) tea.Cmd {
+func (m *todoListModel) toggleTaskComplete(t *models.Task) tea.Cmd {
 	return func() tea.Msg {
 		t.Complete = !t.Complete
 		if _, err := m.stores.Tasks.Update(context.Background(), t); err != nil {
@@ -228,7 +232,7 @@ func (m todoListModel) toggleTaskComplete(t *models.Task) tea.Cmd {
 	}
 }
 
-func newTaskEntryForm(s styles) (form.Model, error) {
+func newTaskEntryForm(s styles) (*form.Model, error) {
 	fields := []form.Field{
 		{
 			Key:      "title",
@@ -245,7 +249,7 @@ func newTaskEntryForm(s styles) (form.Model, error) {
 
 	f, err := form.InitialInputModel(o)
 	if err != nil {
-		return form.Model{}, fmt.Errorf("creating model: %w", err)
+		return nil, fmt.Errorf("creating model: %w", err)
 	}
 
 	return f, nil

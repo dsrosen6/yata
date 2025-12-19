@@ -47,9 +47,9 @@ type (
 
 var ErrNoFields = errors.New("no input fields provided")
 
-func InitialInputModel(o *Opts) (Model, error) {
+func InitialInputModel(o *Opts) (*Model, error) {
 	if len(o.Fields) == 0 {
-		return Model{}, ErrNoFields
+		return nil, ErrNoFields
 	}
 
 	f := append([]Field{}, o.Fields...)
@@ -87,14 +87,14 @@ func InitialInputModel(o *Opts) (Model, error) {
 		m.Inputs[i] = t
 	}
 
-	return *m, nil
+	return m, nil
 }
 
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -121,9 +121,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if s == "up" || s == "shift+tab" {
-				m.focusIndex--
+				m.focusIndexDown()
 			} else {
-				m.focusIndex++
+				m.focusIndexUp()
 			}
 
 			cmds := make([]tea.Cmd, len(m.Inputs))
@@ -150,7 +150,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) View() string {
+func (m *Model) View() string {
 	var b strings.Builder
 
 	for i := range m.Inputs {
@@ -167,7 +167,16 @@ func (m Model) View() string {
 	return b.String()
 }
 
-func (m Model) updateInputs(msg tea.Msg) tea.Cmd {
+func (m *Model) Reset() tea.Cmd {
+	for i := range m.Inputs {
+		m.Inputs[i].Reset()
+	}
+	m.Error = nil
+	m.focusIndex = 0
+	return nil
+}
+
+func (m *Model) updateInputs(msg tea.Msg) tea.Cmd {
 	cmds := make([]tea.Cmd, len(m.Inputs))
 
 	// only focused inputs will respond, so it's fine to update all
@@ -188,7 +197,7 @@ func makeCursor(mode cursor.Mode, style lipgloss.Style) cursor.Model {
 	return c
 }
 
-func (m Model) inputResultCmd() tea.Cmd {
+func (m *Model) inputResultCmd() tea.Cmd {
 	return func() tea.Msg {
 		r := make(Result, len(m.Inputs))
 		for i, input := range m.Inputs {
@@ -196,5 +205,23 @@ func (m Model) inputResultCmd() tea.Cmd {
 		}
 
 		return ResultMsg{r}
+	}
+}
+
+func (m *Model) focusIndexDown() {
+	top := len(m.Inputs)
+	if m.focusIndex > 0 {
+		m.focusIndex--
+	} else {
+		m.focusIndex = top
+	}
+}
+
+func (m *Model) focusIndexUp() {
+	top := len(m.Inputs)
+	if m.focusIndex < top {
+		m.focusIndex++
+	} else {
+		m.focusIndex = 0
 	}
 }
