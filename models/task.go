@@ -9,8 +9,8 @@ type Task struct {
 	ID        int64
 	Title     string
 	Complete  bool
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type TaskRepo interface {
