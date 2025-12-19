@@ -25,11 +25,14 @@ type ConfigIn struct {
 		BoxTitleColor *uint   `json:"box_title_color"`
 		BorderType    *string `json:"border_type"`
 	} `json:"unfocused"`
+
+	ErrorTextColor *uint `json:"error_text_color"`
 }
 
 type Config struct {
-	Focused   FocusedOpts
-	Unfocused UnfocusedOpts
+	Focused        FocusedOpts
+	Unfocused      UnfocusedOpts
+	ErrorTextColor lipgloss.ANSIColor
 }
 
 type FocusedOpts struct {
@@ -47,8 +50,9 @@ type UnfocusedOpts struct {
 }
 
 var (
-	defaultFocusedColor   = lipgloss.ANSIColor(4)
-	defaultUnfocusedColor = lipgloss.ANSIColor(7)
+	defaultFocusedColor   = lipgloss.ANSIColor(4) // blue
+	defaultUnfocusedColor = lipgloss.ANSIColor(7) // white
+	defaultErrorColor     = lipgloss.ANSIColor(1) // red
 
 	defaultConfig = Config{
 		Focused: FocusedOpts{
@@ -63,6 +67,7 @@ var (
 			BoxTitleColor: defaultUnfocusedColor,
 			BorderType:    lipgloss.NormalBorder(),
 		},
+		ErrorTextColor: defaultErrorColor,
 	}
 )
 
@@ -103,6 +108,7 @@ func configInToConfig(in *ConfigIn) *Config {
 			BoxTitleColor: uintPtrToColor(in.Unfocused.BoxTitleColor, dc.Unfocused.BoxTitleColor),
 			BorderType:    strPtrToBorder(in.Unfocused.BorderType, dc.Unfocused.BorderType),
 		},
+		ErrorTextColor: uintPtrToColor(in.ErrorTextColor, dc.ErrorTextColor),
 	}
 }
 

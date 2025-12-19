@@ -15,18 +15,27 @@ type (
 	Opts struct {
 		FocusedStyle     lipgloss.Style
 		UnfocusedStyle   lipgloss.Style
+		ErrorStyle       lipgloss.Style
 		CursorMode       cursor.Mode
-		FieldKeys        []string
+		Fields           []Field
 		PromptIfOneField bool
+	}
+
+	Field struct {
+		Key      string
+		Required bool
+		Validate textinput.ValidateFunc // func(string) error
 	}
 
 	Model struct {
 		Inputs []textinput.Model
-		Keys   []string
+		Fields []Field
 		Opts   Opts
+		Error  error
 
 		focusedStyle     lipgloss.Style
 		unfocusedStyle   lipgloss.Style
+		errorStyle       lipgloss.Style
 		cursor           cursor.Model
 		focusIndex       int
 		promptIfOneField bool
@@ -39,16 +48,17 @@ type (
 var ErrNoFields = errors.New("no input fields provided")
 
 func InitialInputModel(o *Opts) (Model, error) {
-	if len(o.FieldKeys) == 0 {
+	if len(o.Fields) == 0 {
 		return Model{}, ErrNoFields
 	}
 
-	f := append([]string{}, o.FieldKeys...)
+	f := append([]Field{}, o.Fields...)
 	m := &Model{
 		Inputs:           make([]textinput.Model, len(f)),
-		Keys:             f,
+		Fields:           f,
 		focusedStyle:     o.FocusedStyle,
 		unfocusedStyle:   o.UnfocusedStyle,
+		errorStyle:       o.ErrorStyle,
 		cursor:           makeCursor(o.CursorMode, o.FocusedStyle),
 		promptIfOneField: o.PromptIfOneField,
 	}
@@ -59,7 +69,11 @@ func InitialInputModel(o *Opts) (Model, error) {
 		t.Cursor = m.cursor
 		t.Cursor.Style = m.focusedStyle
 
-		t.Prompt = fmt.Sprintf("%s > ", f[i])
+		t.Prompt = fmt.Sprintf("%s > ", f[i].Key)
+		if f[i].Validate != nil {
+			t.Validate = f[i].Validate
+		}
+
 		if len(m.Inputs) == 1 && !m.promptIfOneField {
 			t.Prompt = ""
 		}
@@ -92,6 +106,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			s := msg.String()
 
 			if s == "enter" && m.focusIndex == len(m.Inputs)-1 {
+				in := m.Inputs[m.focusIndex]
+				f := m.Fields[m.focusIndex]
+				if f.Required && in.Value() == "" {
+					m.Error = fmt.Errorf("%s is required", f.Key)
+					return m, nil
+				}
+
+				if in.Err != nil {
+					m.Error = in.Err
+					return m, nil
+				}
 				return m, m.inputResultCmd()
 			}
 
@@ -134,6 +159,10 @@ func (m Model) View() string {
 			b.WriteRune('\n')
 		}
 	}
+	if m.Error != nil {
+		b.WriteRune('\n')
+		b.WriteString(m.errorStyle.Render(m.Error.Error()))
+	}
 
 	return b.String()
 }
@@ -163,7 +192,7 @@ func (m Model) inputResultCmd() tea.Cmd {
 	return func() tea.Msg {
 		r := make(Result, len(m.Inputs))
 		for i, input := range m.Inputs {
-			r[m.Keys[i]] = input.Value()
+			r[m.Fields[i].Key] = input.Value()
 		}
 
 		return ResultMsg{r}

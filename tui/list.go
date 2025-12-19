@@ -130,7 +130,7 @@ func (m todoListModel) View() string {
 
 	fl := fbox.New(fbox.Vertical, 1).
 		AddTitleBox(m.createTasksBox(), 3, nil).
-		AddStyleBox(m.focusedBoxStyle, m.entryForm.View(), 1, func() bool { return m.taskMode == taskModeCreating })
+		AddTitleBox(m.createEntryBox(), 1, func() bool { return m.taskMode == taskModeCreating })
 
 	return fl.Render(m.width, m.height)
 }
@@ -151,6 +151,15 @@ func (m todoListModel) createTasksBox() titlebox.Box {
 		SetTitleStyle(titleStyle)
 }
 
+func (m todoListModel) createEntryBox() titlebox.Box {
+	return titlebox.New().
+		SetTitle("new task").
+		SetBody(m.entryForm.View()).
+		SetTitleAlignment(titlebox.AlignLeft).
+		SetBoxStyle(m.focusedBoxStyle).
+		SetTitleStyle(m.focusedBoxTitleStyle)
+}
+
 func (m todoListModel) tasksOutput() string {
 	if len(m.tasks) == 0 && m.taskMode != taskModeCreating && !m.pendingAdd {
 		return "No tasks found\n"
@@ -167,9 +176,9 @@ func (m todoListModel) tasksOutput() string {
 
 		s := fmt.Sprintf("%s %s", checked, t.Title)
 		if m.cursor == i && m.taskMode != taskModeCreating {
-			b.WriteString(m.focusedTaskStyle.Render(s))
+			b.WriteString(m.focusedTextStyle.Render(s))
 		} else {
-			b.WriteString(m.unfocusedTaskStyle.Render(s))
+			b.WriteString(m.unfocusedTextStyle.Render(s))
 		}
 		b.WriteRune('\n')
 	}
@@ -220,11 +229,18 @@ func (m todoListModel) toggleTaskComplete(t *models.Task) tea.Cmd {
 }
 
 func newTaskEntryForm(s styles) (form.Model, error) {
+	fields := []form.Field{
+		{
+			Key:      "title",
+			Required: true,
+		},
+	}
 	o := &form.Opts{
-		FieldKeys:        []string{"Title"},
-		PromptIfOneField: false,
-		FocusedStyle:     s.focusedTaskStyle,
-		UnfocusedStyle:   s.unfocusedTaskStyle,
+		Fields:           fields,
+		PromptIfOneField: true,
+		FocusedStyle:     s.focusedTextStyle,
+		UnfocusedStyle:   s.unfocusedTextStyle,
+		ErrorStyle:       s.errorTextStyle,
 	}
 
 	f, err := form.InitialInputModel(o)
@@ -236,7 +252,7 @@ func newTaskEntryForm(s styles) (form.Model, error) {
 }
 
 func taskFromInputResult(r form.Result) *models.Task {
-	t, ok := r["Title"]
+	t, ok := r["title"]
 	if !ok {
 		return nil
 	}
