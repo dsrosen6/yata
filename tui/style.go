@@ -15,8 +15,8 @@ type styles struct {
 	errorTextStyle         lipgloss.Style
 }
 
-func generateStyles(cfg *config.Config) {
-	allStyles = styles{
+func generateStyles(cfg *config.Config) styles {
+	return styles{
 		focusedBoxStyle:        lipgloss.NewStyle().Border(cfg.Focused.BorderType).BorderForeground(cfg.Focused.BorderColor).Foreground(cfg.Focused.TextColor),
 		focusedBoxTitleStyle:   lipgloss.NewStyle().Foreground(cfg.Focused.BoxTitleColor),
 		focusedTextStyle:       lipgloss.NewStyle().Foreground(cfg.Focused.TextColor),

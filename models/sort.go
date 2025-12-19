@@ -15,6 +15,7 @@ type (
 const (
 	SortByTitle SortBy = iota
 	SortByComplete
+	SortByDueAt
 	SortByCreatedAt
 	SortByUpdatedAt
 )
@@ -32,6 +33,8 @@ func SortTasks(tasks []*Task, params SortParams) {
 			less = tasks[i].Title < tasks[j].Title
 		case SortByComplete:
 			less = !tasks[i].Complete && tasks[j].Complete
+		case SortByDueAt:
+			less = tasks[i].DueAt.Before(*tasks[j].DueAt)
 		case SortByCreatedAt:
 			less = tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
 		case SortByUpdatedAt:

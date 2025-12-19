@@ -10,10 +10,9 @@ import (
 
 var allStyles styles
 
-type model struct {
+type rootModel struct {
 	cfg       *config.Config
-	stores    *models.AllRepos
-	todoModel *todoListModel
+	todoModel *model
 	dimensions
 }
 
@@ -22,6 +21,7 @@ type dimensions struct {
 }
 
 func Run(cfg *config.Config, stores *models.AllRepos) error {
+	allStyles = generateStyles(cfg)
 	m, err := newModel(cfg, stores)
 	if err != nil {
 		return fmt.Errorf("creating model: %w", err)
@@ -34,24 +34,22 @@ func Run(cfg *config.Config, stores *models.AllRepos) error {
 	return nil
 }
 
-func newModel(cfg *config.Config, stores *models.AllRepos) (*model, error) {
-	generateStyles(cfg)
-	td, err := initialTodoList(allStyles, stores)
+func newModel(cfg *config.Config, stores *models.AllRepos) (*rootModel, error) {
+	td, err := initialModel(allStyles, stores)
 	if err != nil {
 		return nil, fmt.Errorf("creating todo list model: %w", err)
 	}
-	return &model{
+	return &rootModel{
 		cfg:       cfg,
-		stores:    stores,
 		todoModel: td,
 	}, nil
 }
 
-func (m *model) Init() tea.Cmd {
+func (m *rootModel) Init() tea.Cmd {
 	return m.todoModel.Init()
 }
 
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -62,11 +60,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var todoModel tea.Model
 	todoModel, cmd = m.todoModel.Update(msg)
-	m.todoModel = todoModel.(*todoListModel)
+	m.todoModel = todoModel.(*model)
 
 	return m, cmd
 }
 
-func (m *model) View() string {
+func (m *rootModel) View() string {
 	return m.todoModel.View()
 }
