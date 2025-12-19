@@ -12,12 +12,18 @@ import (
 
 func (m *model) refreshTasks() tea.Cmd {
 	return func() tea.Msg {
+		// before wiping and refreshing, get current index
+		currentIndex := m.taskList.Index()
 		tasks, err := m.stores.Tasks.ListAll(context.Background())
 		if err != nil {
 			return storeErrorMsg{err}
 		}
 		items := append([]list.Item{}, tasksToItems(tasks)...)
-		return m.taskList.SetItems(items)
+		cmd := m.taskList.SetItems(items)
+		if currentIndex >= len(items) && len(items) > 0 {
+			m.taskList.Select(len(items) - 1)
+		}
+		return cmd
 	}
 }
 
@@ -53,11 +59,19 @@ func (m *model) toggleTaskComplete(t taskItem) tea.Cmd {
 }
 
 func (m *model) selectedTask() taskItem {
-	return m.taskList.SelectedItem().(taskItem)
+	item := m.taskList.SelectedItem()
+	if item == nil {
+		return taskItem{}
+	}
+	return item.(taskItem)
 }
 
 func (m *model) selectedTaskID() int64 {
-	sel := m.taskList.SelectedItem().(taskItem)
+	item := m.taskList.SelectedItem()
+	if item == nil {
+		return 0
+	}
+	sel := item.(taskItem)
 	if sel.Task == nil {
 		return 0
 	}

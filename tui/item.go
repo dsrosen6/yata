@@ -70,12 +70,14 @@ func (d listItemDelegate) Render(w io.Writer, m list.Model, index int, listItem 
 		return
 	}
 
+	prepend := " "
 	fn := allStyles.unfocusedTextStyle.Render
 	if index == m.Index() {
+		prepend = ">"
 		fn = allStyles.focusedTextStyle.Render
 	}
-
-	_, _ = fmt.Fprint(w, fn(i.Title))
+	str := fmt.Sprintf("%s%s", prepend, i.Title)
+	_, _ = fmt.Fprint(w, fn(str))
 }
 
 func (l taskListItem) FilterValue() string {

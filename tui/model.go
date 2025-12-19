@@ -71,6 +71,7 @@ func (m *model) Init() tea.Cmd {
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -103,6 +104,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "1":
 				m.currentFocus = focusLists
 			}
+			m.taskList, cmd = m.taskList.Update(msg)
+			return m, cmd
 		case refreshTasksMsg:
 			return m, m.refreshTasks()
 		}
@@ -111,7 +114,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "x":
-				if len(m.listList.Items()) > 0 {
+				// Don't allow deleting the "all" entry (which has ID 0)
+				if len(m.listList.Items()) > 0 && m.selectedListID() != 0 {
 					return m, m.deleteList(m.selectedListID())
 				}
 			case "a":
@@ -120,6 +124,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "2":
 				m.currentFocus = focusTasks
 			}
+
+			m.listList, cmd = m.listList.Update(msg)
+			return m, cmd
 		case refreshListsMsg:
 			return m, m.refreshLists()
 		}
@@ -161,10 +168,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	var tlCmd, llCmd tea.Cmd
-	m.taskList, tlCmd = m.taskList.Update(msg)
-	m.listList, llCmd = m.listList.Update(msg)
-	return m, tea.Batch(tlCmd, llCmd)
+	return m, cmd
 }
 
 func (m *model) View() string {

@@ -2,7 +2,9 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,7 +13,8 @@ import (
 )
 
 func listsToItems(lists []*models.List) []list.Item {
-	var items []list.Item
+	// Start with the static "all" entry
+	items := []list.Item{taskListItem{&models.List{Title: "all"}}}
 	for _, l := range lists {
 		items = append(items, taskListItem{l})
 	}
@@ -20,12 +23,17 @@ func listsToItems(lists []*models.List) []list.Item {
 
 func (m *model) refreshLists() tea.Cmd {
 	return func() tea.Msg {
+		currentIndex := m.listList.Index()
 		lists, err := m.stores.Lists.ListAll(context.Background())
 		if err != nil {
 			return storeErrorMsg{err}
 		}
 		items := append([]list.Item{}, listsToItems(lists)...)
-		return m.listList.SetItems(items)
+		cmd := m.listList.SetItems(items)
+		if currentIndex >= len(items) && len(items) > 0 {
+			m.listList.Select(len(items) - 1)
+		}
+		return cmd
 	}
 }
 
@@ -50,11 +58,19 @@ func (m *model) deleteList(id int64) tea.Cmd {
 }
 
 func (m *model) selectedList() taskListItem {
-	return m.listList.SelectedItem().(taskListItem)
+	item := m.listList.SelectedItem()
+	if item == nil {
+		return taskListItem{}
+	}
+	return item.(taskListItem)
 }
 
 func (m *model) selectedListID() int64 {
-	sel := m.listList.SelectedItem().(taskListItem)
+	item := m.listList.SelectedItem()
+	if item == nil {
+		return 0
+	}
+	sel := item.(taskListItem)
 	if sel.List == nil {
 		return 0
 	}
@@ -63,10 +79,18 @@ func (m *model) selectedListID() int64 {
 }
 
 func newListEntryForm() (*form.Model, error) {
+	fn := func(s string) error {
+		if strings.TrimSpace(s) == "all" {
+			return errors.New("'all' is a reserved filter and cannot be used")
+		}
+		return nil
+	}
+
 	fields := []form.Field{
 		{
 			Key:      "title",
 			Required: true,
+			Validate: fn,
 		},
 	}
 	o := &form.Opts{
