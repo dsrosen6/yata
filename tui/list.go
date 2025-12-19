@@ -3,8 +3,10 @@ package tui
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	fbox "github.com/dsrosen6/tea-flexbox"
 	"github.com/dsrosen6/tea-flexbox/titlebox"
@@ -15,12 +17,13 @@ import (
 type (
 	todoListModel struct {
 		stores *models.AllRepos
-		tasks  []*models.Task
+		tasks  []todoItem
 
 		cursor     int
 		taskMode   taskMode
 		entryForm  *form.Model
 		sortParams *models.SortParams
+		list       list.Model
 		selected   map[int]struct{}
 
 		pendingAdd bool
@@ -30,10 +33,38 @@ type (
 
 	storeErrorMsg     struct{ error }
 	refreshTasksMsg   struct{}
-	tasksRefreshedMsg struct{ tasks []*models.Task }
+	tasksRefreshedMsg struct{}
+	todoItem          struct{ *models.Task }
+	todoItemDelegate  struct{}
 
 	taskMode int
 )
+
+func (d todoItemDelegate) Height() int                             { return 1 }
+func (d todoItemDelegate) Spacing() int                            { return 0 }
+func (d todoItemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+func (d todoItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	i, ok := listItem.(todoItem)
+	if !ok {
+		return
+	}
+
+	checked := "󰄱"
+	if i.Complete {
+		checked = "󰄵"
+	}
+
+	str := fmt.Sprintf("%s %s", checked, i.Title)
+	fn := allStyles.unfocusedTextStyle.Render
+	if index == m.Index() {
+		fn = func(s ...string) string {
+			return allStyles.focusedTextStyle.Render(strings.Join(s, " "))
+		}
+	}
+
+	fmt.Fprint(w, fn(str))
+}
+func (t todoItem) FilterValue() string { return t.Title }
 
 const (
 	taskModeViewing taskMode = iota
@@ -46,12 +77,23 @@ func initialTodoList(s styles, stores *models.AllRepos) (*todoListModel, error) 
 		return nil, fmt.Errorf("creating task entry form: %w", err)
 	}
 
+	tasks, err := stores.Tasks.ListAll(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("getting initial tasks: %w", err)
+	}
+
+	items := tasksToItems(tasks)
+	l := list.New(items, todoItemDelegate{}, 10, 10)
+	l.SetShowTitle(false)
+	l.SetShowStatusBar(false)
+	l.SetShowHelp(false)
 	return &todoListModel{
 		styles:     s,
+		list:       l,
 		stores:     stores,
 		entryForm:  entry,
 		sortParams: &models.SortParams{SortBy: models.SortByComplete},
-		tasks:      []*models.Task{},
+		tasks:      []todoItem{},
 		selected:   make(map[int]struct{}),
 	}, nil
 }
@@ -74,17 +116,13 @@ func (m *todoListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "q", "ctrl+c":
 				return m, tea.Quit
-			case "up", "k":
-				m.cursor = cursorUp(m.cursor, len(m.tasks)-1)
-			case "down", "j":
-				m.cursor = cursorDown(m.cursor, len(m.tasks)-1)
 			case "enter", " ":
-				if len(m.tasks) > 0 {
-					return m, m.toggleTaskComplete(m.tasks[m.cursor])
+				if len(m.list.Items()) > 0 {
+					return m, m.toggleTaskComplete(m.selectedTask())
 				}
-			case "d":
-				if len(m.tasks) > 0 {
-					return m, m.deleteTask(m.tasks[m.cursor].ID)
+			case "x":
+				if len(m.list.Items()) > 0 {
+					return m, m.deleteTask(m.selectedTaskID())
 				}
 			case "a":
 				m.taskMode = taskModeCreating
@@ -93,15 +131,6 @@ func (m *todoListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case refreshTasksMsg:
 			return m, m.refreshTasks()
 		case tasksRefreshedMsg:
-			m.tasks = msg.tasks
-			if len(m.tasks) == 0 {
-				m.cursor = 0
-			} else if m.pendingAdd {
-				m.cursor = len(m.tasks) - 1
-			} else if m.cursor >= len(m.tasks) {
-				m.cursor = len(m.tasks) - 1
-			}
-
 			m.pendingAdd = false
 			return m, nil
 		}
@@ -126,7 +155,9 @@ func (m *todoListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	return m, nil
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
 }
 
 func (m *todoListModel) View() string {
@@ -151,7 +182,7 @@ func (m *todoListModel) createTasksBox() titlebox.Box {
 
 	return titlebox.New().
 		SetTitle("tasks").
-		SetBody(m.tasksOutput()).
+		SetBody(m.list.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
 		SetBoxStyle(boxStyle.Padding(0, 1)).
 		SetTitleStyle(titleStyle)
@@ -166,46 +197,20 @@ func (m *todoListModel) createEntryBox() titlebox.Box {
 		SetTitleStyle(m.focusedBoxTitleStyle)
 }
 
-func (m *todoListModel) tasksOutput() string {
-	if len(m.tasks) == 0 && m.taskMode != taskModeCreating && !m.pendingAdd {
-		return "No tasks found\n"
-	}
-
-	uncheckedIcon := "󰄱"
-	checkedIcon := "󰄵"
-	var b strings.Builder
-	for i, t := range m.tasks {
-		checked := uncheckedIcon
-		if t.Complete {
-			checked = checkedIcon
-		}
-
-		s := fmt.Sprintf("%s %s", checked, t.Title)
-		if m.cursor == i && m.taskMode != taskModeCreating {
-			b.WriteString(m.focusedTextStyle.Render(s))
-		} else {
-			b.WriteString(m.unfocusedTextStyle.Render(s))
-		}
-		b.WriteRune('\n')
-	}
-
-	return b.String()
-}
-
 func (m *todoListModel) refreshTasks() tea.Cmd {
 	return func() tea.Msg {
 		tasks, err := m.stores.Tasks.ListAll(context.Background())
 		if err != nil {
 			return storeErrorMsg{err}
 		}
-		models.SortTasks(tasks, *m.sortParams)
-		return tasksRefreshedMsg{tasks: tasks}
+		items := append([]list.Item{}, tasksToItems(tasks)...)
+		return m.list.SetItems(items)
 	}
 }
 
-func (m *todoListModel) insertTask(t *models.Task) tea.Cmd {
+func (m *todoListModel) insertTask(t todoItem) tea.Cmd {
 	return func() tea.Msg {
-		if _, err := m.stores.Tasks.Create(context.Background(), t); err != nil {
+		if _, err := m.stores.Tasks.Create(context.Background(), t.Task); err != nil {
 			return storeErrorMsg{err}
 		}
 
@@ -223,15 +228,28 @@ func (m *todoListModel) deleteTask(id int64) tea.Cmd {
 	}
 }
 
-func (m *todoListModel) toggleTaskComplete(t *models.Task) tea.Cmd {
+func (m *todoListModel) toggleTaskComplete(t todoItem) tea.Cmd {
 	return func() tea.Msg {
 		t.Complete = !t.Complete
-		if _, err := m.stores.Tasks.Update(context.Background(), t); err != nil {
+		if _, err := m.stores.Tasks.Update(context.Background(), t.Task); err != nil {
 			return storeErrorMsg{err}
 		}
 
 		return refreshTasksMsg{}
 	}
+}
+
+func (m *todoListModel) selectedTask() todoItem {
+	return m.list.SelectedItem().(todoItem)
+}
+
+func (m *todoListModel) selectedTaskID() int64 {
+	sel := m.list.SelectedItem().(todoItem)
+	if sel.Task == nil {
+		return 0
+	}
+
+	return sel.ID
 }
 
 func newTaskEntryForm(s styles) (*form.Model, error) {
@@ -257,13 +275,23 @@ func newTaskEntryForm(s styles) (*form.Model, error) {
 	return f, nil
 }
 
-func taskFromInputResult(r form.Result) *models.Task {
+func taskFromInputResult(r form.Result) todoItem {
 	t, ok := r["title"]
 	if !ok {
-		return nil
+		return todoItem{}
 	}
 
-	return &models.Task{
-		Title: t,
+	return todoItem{
+		Task: &models.Task{
+			Title: t,
+		},
 	}
+}
+
+func tasksToItems(tasks []*models.Task) []list.Item {
+	var items []list.Item
+	for _, t := range tasks {
+		items = append(items, todoItem{t})
+	}
+	return items
 }

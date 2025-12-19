@@ -8,12 +8,13 @@ import (
 	"github.com/dsrosen6/yata/models"
 )
 
+var allStyles styles
+
 type model struct {
 	cfg       *config.Config
 	stores    *models.AllRepos
 	todoModel *todoListModel
 	dimensions
-	styles
 }
 
 type dimensions struct {
@@ -34,8 +35,8 @@ func Run(cfg *config.Config, stores *models.AllRepos) error {
 }
 
 func newModel(cfg *config.Config, stores *models.AllRepos) (*model, error) {
-	s := generateStyles(cfg)
-	td, err := initialTodoList(s, stores)
+	generateStyles(cfg)
+	td, err := initialTodoList(allStyles, stores)
 	if err != nil {
 		return nil, fmt.Errorf("creating todo list model: %w", err)
 	}
@@ -43,7 +44,6 @@ func newModel(cfg *config.Config, stores *models.AllRepos) (*model, error) {
 		cfg:       cfg,
 		stores:    stores,
 		todoModel: td,
-		styles:    s,
 	}, nil
 }
 
