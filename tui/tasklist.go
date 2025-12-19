@@ -25,7 +25,7 @@ func (m *model) refreshLists() tea.Cmd {
 			return storeErrorMsg{err}
 		}
 		items := append([]list.Item{}, listsToItems(lists)...)
-		return m.taskList.SetItems(items)
+		return m.listList.SetItems(items)
 	}
 }
 
@@ -35,7 +35,7 @@ func (m *model) insertList(l taskListItem) tea.Cmd {
 			return storeErrorMsg{err}
 		}
 
-		return tea.BatchMsg{m.refreshLists(), m.entryForm.Reset()}
+		return tea.BatchMsg{m.refreshLists(), m.listEntryForm.Reset()}
 	}
 }
 
@@ -49,7 +49,20 @@ func (m *model) deleteList(id int64) tea.Cmd {
 	}
 }
 
-func newListEntryForm(s styles) (*form.Model, error) {
+func (m *model) selectedList() taskListItem {
+	return m.listList.SelectedItem().(taskListItem)
+}
+
+func (m *model) selectedListID() int64 {
+	sel := m.listList.SelectedItem().(taskListItem)
+	if sel.List == nil {
+		return 0
+	}
+
+	return sel.ID
+}
+
+func newListEntryForm() (*form.Model, error) {
 	fields := []form.Field{
 		{
 			Key:      "title",
@@ -59,9 +72,9 @@ func newListEntryForm(s styles) (*form.Model, error) {
 	o := &form.Opts{
 		Fields:           fields,
 		PromptIfOneField: true,
-		FocusedStyle:     s.focusedTextStyle,
-		UnfocusedStyle:   s.unfocusedTextStyle,
-		ErrorStyle:       s.errorTextStyle,
+		FocusedStyle:     allStyles.focusedTextStyle,
+		UnfocusedStyle:   allStyles.unfocusedTextStyle,
+		ErrorStyle:       allStyles.errorTextStyle,
 	}
 
 	f, err := form.InitialInputModel(o)

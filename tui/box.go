@@ -3,15 +3,15 @@ package tui
 import "github.com/dsrosen6/tea-flexbox/titlebox"
 
 func (m *model) createTasksBox() titlebox.Box {
-	boxStyle := m.unfocusedBoxStyle
-	titleStyle := m.unfocusedBoxTitleStyle
+	boxStyle := allStyles.unfocusedBoxStyle
+	titleStyle := allStyles.unfocusedBoxTitleStyle
 	if m.currentFocus == focusTasks {
-		boxStyle = m.focusedBoxStyle
-		titleStyle = m.focusedBoxTitleStyle
+		boxStyle = allStyles.focusedBoxStyle
+		titleStyle = allStyles.focusedBoxTitleStyle
 	}
 
 	return titlebox.New().
-		SetTitle("tasks").
+		SetTitle("[2]tasks").
 		SetBody(m.taskList.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
 		SetBoxStyle(boxStyle.Padding(0, 1)).
@@ -19,15 +19,15 @@ func (m *model) createTasksBox() titlebox.Box {
 }
 
 func (m *model) createListsBox() titlebox.Box {
-	boxStyle := m.unfocusedBoxStyle
-	titleStyle := m.unfocusedBoxTitleStyle
+	boxStyle := allStyles.unfocusedBoxStyle
+	titleStyle := allStyles.unfocusedBoxTitleStyle
 	if m.currentFocus == focusLists {
-		boxStyle = m.focusedBoxStyle
-		titleStyle = m.focusedBoxTitleStyle
+		boxStyle = allStyles.focusedBoxStyle
+		titleStyle = allStyles.focusedBoxTitleStyle
 	}
 
 	return titlebox.New().
-		SetTitle("lists").
+		SetTitle("[1]lists").
 		SetBody(m.listList.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
 		SetBoxStyle(boxStyle.Padding(0, 1)).
@@ -37,16 +37,17 @@ func (m *model) createListsBox() titlebox.Box {
 func (m *model) createTaskEntryBox() titlebox.Box {
 	return titlebox.New().
 		SetTitle("new task").
-		SetBody(m.entryForm.View()).
+		SetBody(m.taskEntryForm.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
-		SetBoxStyle(m.focusedBoxStyle).
-		SetTitleStyle(m.focusedBoxTitleStyle)
+		SetBoxStyle(allStyles.focusedBoxStyle).
+		SetTitleStyle(allStyles.focusedBoxTitleStyle)
 }
 
 func (m *model) createListEntryBox() titlebox.Box {
 	return titlebox.New().
 		SetTitle("new list").
+		SetBody(m.listEntryForm.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
-		SetBoxStyle(m.focusedBoxStyle).
-		SetTitleStyle(m.focusedBoxTitleStyle)
+		SetBoxStyle(allStyles.focusedBoxStyle).
+		SetTitleStyle(allStyles.focusedBoxTitleStyle)
 }

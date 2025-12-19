@@ -27,7 +27,7 @@ func (m *model) insertTask(t taskItem) tea.Cmd {
 			return storeErrorMsg{err}
 		}
 
-		return tea.BatchMsg{m.refreshTasks(), m.entryForm.Reset()}
+		return tea.BatchMsg{m.refreshTasks(), m.taskEntryForm.Reset()}
 	}
 }
 
@@ -65,7 +65,7 @@ func (m *model) selectedTaskID() int64 {
 	return sel.ID
 }
 
-func newTaskEntryForm(s styles) (*form.Model, error) {
+func newTaskEntryForm() (*form.Model, error) {
 	fields := []form.Field{
 		{
 			Key:      "title",
@@ -75,9 +75,9 @@ func newTaskEntryForm(s styles) (*form.Model, error) {
 	o := &form.Opts{
 		Fields:           fields,
 		PromptIfOneField: true,
-		FocusedStyle:     s.focusedTextStyle,
-		UnfocusedStyle:   s.unfocusedTextStyle,
-		ErrorStyle:       s.errorTextStyle,
+		FocusedStyle:     allStyles.focusedTextStyle,
+		UnfocusedStyle:   allStyles.unfocusedTextStyle,
+		ErrorStyle:       allStyles.errorTextStyle,
 	}
 
 	f, err := form.InitialInputModel(o)

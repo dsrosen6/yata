@@ -35,7 +35,7 @@ func Run(cfg *config.Config, stores *models.AllRepos) error {
 }
 
 func newModel(cfg *config.Config, stores *models.AllRepos) (*rootModel, error) {
-	td, err := initialModel(allStyles, stores)
+	td, err := initialModel(stores)
 	if err != nil {
 		return nil, fmt.Errorf("creating todo list model: %w", err)
 	}
