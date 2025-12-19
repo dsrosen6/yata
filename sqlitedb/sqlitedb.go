@@ -34,11 +34,16 @@ func (h *Handler) InitStores(ctx context.Context) (*models.AllRepos, error) {
 		return nil, fmt.Errorf("executing schema: %w", err)
 	}
 
-	return &models.AllRepos{
-		Tasks: NewTaskRepo(h.queries),
-	}, nil
+	return NewRepos(h.queries), nil
 }
 
 func (h *Handler) Close() error {
 	return h.db.Close()
+}
+
+func NewRepos(q *Queries) *models.AllRepos {
+	return &models.AllRepos{
+		Tasks: NewTaskRepo(q),
+		Lists: NewListRepo(q),
+	}
 }

@@ -108,7 +108,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if s == "enter" && m.focusIndex == len(m.Inputs)-1 {
 				in := m.Inputs[m.focusIndex]
 				f := m.Fields[m.focusIndex]
-				if f.Required && in.Value() == "" {
+				if f.Required && strings.TrimSpace(in.Value()) == "" {
 					m.Error = fmt.Errorf("%s is required", f.Key)
 					return m, nil
 				}
@@ -201,7 +201,7 @@ func (m *Model) inputResultCmd() tea.Cmd {
 	return func() tea.Msg {
 		r := make(Result, len(m.Inputs))
 		for i, input := range m.Inputs {
-			r[m.Fields[i].Key] = input.Value()
+			r[m.Fields[i].Key] = strings.TrimSpace(input.Value())
 		}
 
 		return ResultMsg{r}

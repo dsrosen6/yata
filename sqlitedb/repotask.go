@@ -10,12 +10,6 @@ type TaskRepo struct {
 	q *Queries
 }
 
-func NewRepos(q *Queries) *models.AllRepos {
-	return &models.AllRepos{
-		Tasks: NewTaskRepo(q),
-	}
-}
-
 func NewTaskRepo(q *Queries) *TaskRepo {
 	return &TaskRepo{
 		q: q,
@@ -24,6 +18,24 @@ func NewTaskRepo(q *Queries) *TaskRepo {
 
 func (tr *TaskRepo) ListAll(ctx context.Context) ([]*models.Task, error) {
 	dt, err := tr.q.ListAllTasks(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return dbTaskSliceToTaskSlice(dt), nil
+}
+
+func (tr *TaskRepo) ListByListID(ctx context.Context, listID int64) ([]*models.Task, error) {
+	dt, err := tr.q.ListTasksByListID(ctx, &listID)
+	if err != nil {
+		return nil, err
+	}
+
+	return dbTaskSliceToTaskSlice(dt), nil
+}
+
+func (tr *TaskRepo) ListByParentID(ctx context.Context, parentID int64) ([]*models.Task, error) {
+	dt, err := tr.q.ListTasksByParentTaskID(ctx, &parentID)
 	if err != nil {
 		return nil, err
 	}
@@ -64,16 +76,22 @@ func (tr *TaskRepo) Delete(ctx context.Context, id int64) error {
 
 func taskToCreateParams(t *models.Task) *CreateTaskParams {
 	return &CreateTaskParams{
-		Title:    t.Title,
-		Complete: t.Complete,
+		Title:        t.Title,
+		ParentTaskID: t.ParentTaskID,
+		ListID:       t.ListID,
+		Complete:     t.Complete,
+		DueAt:        t.DueAt,
 	}
 }
 
 func taskToUpdateParams(t *models.Task) *UpdateTaskParams {
 	return &UpdateTaskParams{
-		ID:       t.ID,
-		Title:    t.Title,
-		Complete: t.Complete,
+		ID:           t.ID,
+		ParentTaskID: t.ParentTaskID,
+		ListID:       t.ListID,
+		Title:        t.Title,
+		Complete:     t.Complete,
+		DueAt:        t.DueAt,
 	}
 }
 
@@ -88,10 +106,13 @@ func dbTaskSliceToTaskSlice(ds []*Task) []*models.Task {
 
 func dbTaskToTask(d *Task) *models.Task {
 	return &models.Task{
-		ID:        d.ID,
-		Title:     d.Title,
-		Complete:  d.Complete,
-		CreatedAt: d.CreatedAt,
-		UpdatedAt: d.UpdatedAt,
+		ID:           d.ID,
+		Title:        d.Title,
+		ParentTaskID: d.ParentTaskID,
+		ListID:       d.ListID,
+		Complete:     d.Complete,
+		DueAt:        d.DueAt,
+		CreatedAt:    d.CreatedAt,
+		UpdatedAt:    d.UpdatedAt,
 	}
 }

@@ -8,10 +8,21 @@ import (
 	"time"
 )
 
+type List struct {
+	ID           int64
+	Title        string
+	ParentListID *int64
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
 type Task struct {
-	ID        int64
-	Title     string
-	Complete  bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           int64
+	Title        string
+	ParentTaskID *int64
+	ListID       *int64
+	Complete     bool
+	DueAt        *time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }

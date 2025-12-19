@@ -9,4 +9,5 @@ type StoreHandler interface {
 
 type AllRepos struct {
 	Tasks TaskRepo
+	Lists ListRepo
 }
