@@ -15,12 +15,13 @@ type (
 	model struct {
 		stores *models.AllRepos
 
-		taskList      list.Model
-		listList      list.Model
-		taskEntryForm *form.Model
-		listEntryForm *form.Model
-		sortParams    *models.SortParams
-		currentFocus  focus
+		taskList         list.Model
+		projectList      list.Model
+		taskEntryForm    *form.Model
+		projectEntryForm *form.Model
+		sortParams       *models.SortParams
+		currentFocus     focus
+		currentProjectID int64
 
 		dimensions
 	}
@@ -30,9 +31,9 @@ type (
 
 const (
 	focusTasks focus = iota
-	focusLists
+	focusProjects
 	focusTaskEntry
-	focusListEntry
+	focusProjectEntry
 )
 
 func initialModel(stores *models.AllRepos) (*model, error) {
@@ -41,9 +42,9 @@ func initialModel(stores *models.AllRepos) (*model, error) {
 		return nil, fmt.Errorf("creating task entry form: %w", err)
 	}
 
-	le, err := newListEntryForm()
+	pe, err := newProjectEntryForm()
 	if err != nil {
-		return nil, fmt.Errorf("creating list entry form: %w", err)
+		return nil, fmt.Errorf("creating project entry form: %w", err)
 	}
 
 	tasks, err := stores.Tasks.ListAll(context.Background())
@@ -51,23 +52,23 @@ func initialModel(stores *models.AllRepos) (*model, error) {
 		return nil, fmt.Errorf("getting initial tasks: %w", err)
 	}
 
-	lists, err := stores.Lists.ListAll(context.Background())
+	projects, err := stores.Projects.ListAll(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("getting initial lists: %w", err)
+		return nil, fmt.Errorf("getting initial projects: %w", err)
 	}
 
 	return &model{
-		stores:        stores,
-		taskList:      initialTaskList(tasks),
-		listList:      initialListList(lists),
-		taskEntryForm: te,
-		listEntryForm: le,
-		sortParams:    &models.SortParams{SortBy: models.SortByComplete},
+		stores:           stores,
+		taskList:         initialTaskList(tasks),
+		projectList:      initialProjectList(projects),
+		taskEntryForm:    te,
+		projectEntryForm: pe,
+		sortParams:       &models.SortParams{SortBy: models.SortByComplete},
 	}, nil
 }
 
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(m.refreshTasks(), m.taskEntryForm.Init())
+	return tea.Batch(m.refreshTasks(m.currentProjectID), m.taskEntryForm.Init())
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -77,7 +78,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tea.KeyMsg:
-		if m.currentFocus == focusTasks || m.currentFocus == focusLists {
+		if m.currentFocus == focusTasks || m.currentFocus == focusProjects {
 			switch msg.String() {
 			case "q", "ctrl+c":
 				return m, tea.Quit
@@ -102,33 +103,42 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentFocus = focusTaskEntry
 				return m, m.taskEntryForm.Init()
 			case "1":
-				m.currentFocus = focusLists
+				m.currentFocus = focusProjects
 			}
 			m.taskList, cmd = m.taskList.Update(msg)
 			return m, cmd
 		case refreshTasksMsg:
-			return m, m.refreshTasks()
+			return m, m.refreshTasks(m.currentProjectID)
 		}
-	case focusLists:
+	case focusProjects:
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "x":
 				// Don't allow deleting the "all" entry (which has ID 0)
-				if len(m.listList.Items()) > 0 && m.selectedListID() != 0 {
-					return m, m.deleteList(m.selectedListID())
+				if len(m.projectList.Items()) > 0 && m.selectedProjectID() != 0 {
+					return m, m.deleteProject(m.selectedProjectID())
 				}
 			case "a":
-				m.currentFocus = focusListEntry
-				return m, m.listEntryForm.Init()
+				m.currentFocus = focusProjectEntry
+				return m, m.projectEntryForm.Init()
 			case "2":
 				m.currentFocus = focusTasks
 			}
+			oldPjID := m.selectedProjectID()
+			m.projectList, cmd = m.projectList.Update(msg)
+			newPjID := m.selectedProjectID()
+			if oldPjID != newPjID {
+				m.currentProjectID = newPjID
+				return m, tea.Batch(cmd, m.refreshTasks(m.currentProjectID))
+			}
 
-			m.listList, cmd = m.listList.Update(msg)
 			return m, cmd
-		case refreshListsMsg:
-			return m, m.refreshLists()
+		case refreshProjectsMsg:
+			return m, tea.Batch()
+		case projectsRefreshedMsg:
+			m.currentProjectID = m.selectedProjectID()
+			return m, m.refreshTasks(m.currentProjectID)
 		}
 
 	case focusTaskEntry:
@@ -145,25 +155,25 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case form.ResultMsg:
 			m.currentFocus = focusTasks
 			t := taskFromInputResult(msg.Result)
-			return m, m.insertTask(t)
+			return m, m.insertTask(t, m.currentProjectID)
 		}
 		return m, cmd
 
-	case focusListEntry:
-		f, cmd := m.listEntryForm.Update(msg)
-		m.listEntryForm = f.(*form.Model)
+	case focusProjectEntry:
+		f, cmd := m.projectEntryForm.Update(msg)
+		m.projectEntryForm = f.(*form.Model)
 
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "esc":
-				m.currentFocus = focusLists
-				return m, m.listEntryForm.Reset()
+				m.currentFocus = focusProjects
+				return m, m.projectEntryForm.Reset()
 			}
 		case form.ResultMsg:
-			m.currentFocus = focusLists
-			l := listFromInputResult(msg.Result)
-			return m, m.insertList(l)
+			m.currentFocus = focusProjects
+			p := projectFromInputResult(msg.Result)
+			return m, m.insertProject(p)
 		}
 		return m, cmd
 	}
@@ -177,13 +187,13 @@ func (m *model) View() string {
 	}
 
 	topBox := fbox.New(fbox.Horizontal, 4).
-		AddTitleBox(m.createListsBox(), 1, nil).
+		AddTitleBox(m.createProjectsBox(), 1, nil).
 		AddTitleBox(m.createTasksBox(), 10, nil)
 
 	fl := fbox.New(fbox.Vertical, 1).
 		AddFlexBox(topBox, 7, nil).
 		AddTitleBox(m.createTaskEntryBox(), 1, func() bool { return m.currentFocus == focusTaskEntry }).
-		AddTitleBox(m.createListEntryBox(), 1, func() bool { return m.currentFocus == focusListEntry })
+		AddTitleBox(m.createProjectEntryBox(), 1, func() bool { return m.currentFocus == focusProjectEntry })
 
 	return fl.Render(m.width, m.height)
 }

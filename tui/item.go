@@ -10,10 +10,10 @@ import (
 )
 
 type (
-	taskItem         struct{ *models.Task }
-	taskListItem     struct{ *models.List }
-	taskItemDelegate struct{}
-	listItemDelegate struct{}
+	taskItem             struct{ *models.Task }
+	taskProjectItem      struct{ *models.Project }
+	taskItemDelegate     struct{}
+	projectItemDelegate  struct{}
 )
 
 func (d taskItemDelegate) Height() int {
@@ -52,20 +52,20 @@ func (t taskItem) FilterValue() string {
 	return t.Title
 }
 
-func (d listItemDelegate) Height() int {
+func (d projectItemDelegate) Height() int {
 	return 1
 }
 
-func (d listItemDelegate) Spacing() int {
+func (d projectItemDelegate) Spacing() int {
 	return 0
 }
 
-func (d listItemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd {
+func (d projectItemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd {
 	return nil
 }
 
-func (d listItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	i, ok := listItem.(taskListItem)
+func (d projectItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	i, ok := listItem.(taskProjectItem)
 	if !ok {
 		return
 	}
@@ -80,6 +80,6 @@ func (d listItemDelegate) Render(w io.Writer, m list.Model, index int, listItem 
 	_, _ = fmt.Fprint(w, fn(str))
 }
 
-func (l taskListItem) FilterValue() string {
-	return l.Title
+func (p taskProjectItem) FilterValue() string {
+	return p.Title
 }

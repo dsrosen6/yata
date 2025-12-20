@@ -12,20 +12,20 @@ import (
 
 const createTask = `-- name: CreateTask :one
 INSERT INTO task (
-    title, 
-    parent_task_id, 
-    list_id, 
+    title,
+    parent_task_id,
+    project_id,
     complete,
     due_at
 ) VALUES (
     ?, ?, ?, ?, ?
-) RETURNING id, title, parent_task_id, list_id, complete, due_at, created_at, updated_at
+) RETURNING id, title, parent_task_id, project_id, complete, due_at, created_at, updated_at
 `
 
 type CreateTaskParams struct {
 	Title        string
 	ParentTaskID *int64
-	ListID       *int64
+	ProjectID    *int64
 	Complete     bool
 	DueAt        *time.Time
 }
@@ -34,7 +34,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg *CreateTaskParams) (*Task,
 	row := q.db.QueryRowContext(ctx, createTask,
 		arg.Title,
 		arg.ParentTaskID,
-		arg.ListID,
+		arg.ProjectID,
 		arg.Complete,
 		arg.DueAt,
 	)
@@ -43,7 +43,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg *CreateTaskParams) (*Task,
 		&i.ID,
 		&i.Title,
 		&i.ParentTaskID,
-		&i.ListID,
+		&i.ProjectID,
 		&i.Complete,
 		&i.DueAt,
 		&i.CreatedAt,
@@ -63,7 +63,7 @@ func (q *Queries) DeleteTask(ctx context.Context, id int64) error {
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, title, parent_task_id, list_id, complete, due_at, created_at, updated_at FROM task
+SELECT id, title, parent_task_id, project_id, complete, due_at, created_at, updated_at FROM task
 WHERE id = ? LIMIT 1
 `
 
@@ -74,7 +74,7 @@ func (q *Queries) GetTask(ctx context.Context, id int64) (*Task, error) {
 		&i.ID,
 		&i.Title,
 		&i.ParentTaskID,
-		&i.ListID,
+		&i.ProjectID,
 		&i.Complete,
 		&i.DueAt,
 		&i.CreatedAt,
@@ -84,7 +84,7 @@ func (q *Queries) GetTask(ctx context.Context, id int64) (*Task, error) {
 }
 
 const listAllTasks = `-- name: ListAllTasks :many
-SELECT id, title, parent_task_id, list_id, complete, due_at, created_at, updated_at FROM task
+SELECT id, title, parent_task_id, project_id, complete, due_at, created_at, updated_at FROM task
 `
 
 func (q *Queries) ListAllTasks(ctx context.Context) ([]*Task, error) {
@@ -100,44 +100,7 @@ func (q *Queries) ListAllTasks(ctx context.Context) ([]*Task, error) {
 			&i.ID,
 			&i.Title,
 			&i.ParentTaskID,
-			&i.ListID,
-			&i.Complete,
-			&i.DueAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTasksByListID = `-- name: ListTasksByListID :many
-SELECT id, title, parent_task_id, list_id, complete, due_at, created_at, updated_at FROM task
-WHERE list_id = ?
-`
-
-func (q *Queries) ListTasksByListID(ctx context.Context, listID *int64) ([]*Task, error) {
-	rows, err := q.db.QueryContext(ctx, listTasksByListID, listID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []*Task{}
-	for rows.Next() {
-		var i Task
-		if err := rows.Scan(
-			&i.ID,
-			&i.Title,
-			&i.ParentTaskID,
-			&i.ListID,
+			&i.ProjectID,
 			&i.Complete,
 			&i.DueAt,
 			&i.CreatedAt,
@@ -157,7 +120,7 @@ func (q *Queries) ListTasksByListID(ctx context.Context, listID *int64) ([]*Task
 }
 
 const listTasksByParentTaskID = `-- name: ListTasksByParentTaskID :many
-SELECT id, title, parent_task_id, list_id, complete, due_at, created_at, updated_at FROM task
+SELECT id, title, parent_task_id, project_id, complete, due_at, created_at, updated_at FROM task
 WHERE parent_task_id = ?
 `
 
@@ -174,7 +137,44 @@ func (q *Queries) ListTasksByParentTaskID(ctx context.Context, parentTaskID *int
 			&i.ID,
 			&i.Title,
 			&i.ParentTaskID,
-			&i.ListID,
+			&i.ProjectID,
+			&i.Complete,
+			&i.DueAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTasksByProjectID = `-- name: ListTasksByProjectID :many
+SELECT id, title, parent_task_id, project_id, complete, due_at, created_at, updated_at FROM task
+WHERE project_id = ?
+`
+
+func (q *Queries) ListTasksByProjectID(ctx context.Context, projectID *int64) ([]*Task, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksByProjectID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*Task{}
+	for rows.Next() {
+		var i Task
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.ParentTaskID,
+			&i.ProjectID,
 			&i.Complete,
 			&i.DueAt,
 			&i.CreatedAt,
@@ -198,18 +198,18 @@ UPDATE task
 SET
     title = ?,
     parent_task_id = ?,
-    list_id = ?,
+    project_id = ?,
     complete = ?,
     due_at = ?,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = ?
-RETURNING id, title, parent_task_id, list_id, complete, due_at, created_at, updated_at
+RETURNING id, title, parent_task_id, project_id, complete, due_at, created_at, updated_at
 `
 
 type UpdateTaskParams struct {
 	Title        string
 	ParentTaskID *int64
-	ListID       *int64
+	ProjectID    *int64
 	Complete     bool
 	DueAt        *time.Time
 	ID           int64
@@ -219,7 +219,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg *UpdateTaskParams) (*Task,
 	row := q.db.QueryRowContext(ctx, updateTask,
 		arg.Title,
 		arg.ParentTaskID,
-		arg.ListID,
+		arg.ProjectID,
 		arg.Complete,
 		arg.DueAt,
 		arg.ID,
@@ -229,7 +229,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg *UpdateTaskParams) (*Task,
 		&i.ID,
 		&i.Title,
 		&i.ParentTaskID,
-		&i.ListID,
+		&i.ProjectID,
 		&i.Complete,
 		&i.DueAt,
 		&i.CreatedAt,

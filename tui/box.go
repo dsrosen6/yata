@@ -18,17 +18,17 @@ func (m *model) createTasksBox() titlebox.Box {
 		SetTitleStyle(titleStyle)
 }
 
-func (m *model) createListsBox() titlebox.Box {
+func (m *model) createProjectsBox() titlebox.Box {
 	boxStyle := allStyles.unfocusedBoxStyle
 	titleStyle := allStyles.unfocusedBoxTitleStyle
-	if m.currentFocus == focusLists {
+	if m.currentFocus == focusProjects {
 		boxStyle = allStyles.focusedBoxStyle
 		titleStyle = allStyles.focusedBoxTitleStyle
 	}
 
 	return titlebox.New().
-		SetTitle("[1]lists").
-		SetBody(m.listList.View()).
+		SetTitle("[1]projects").
+		SetBody(m.projectList.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
 		SetBoxStyle(boxStyle.Padding(0, 1)).
 		SetTitleStyle(titleStyle)
@@ -43,10 +43,10 @@ func (m *model) createTaskEntryBox() titlebox.Box {
 		SetTitleStyle(allStyles.focusedBoxTitleStyle)
 }
 
-func (m *model) createListEntryBox() titlebox.Box {
+func (m *model) createProjectEntryBox() titlebox.Box {
 	return titlebox.New().
-		SetTitle("new list").
-		SetBody(m.listEntryForm.View()).
+		SetTitle("new project").
+		SetBody(m.projectEntryForm.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
 		SetBoxStyle(allStyles.focusedBoxStyle).
 		SetTitleStyle(allStyles.focusedBoxTitleStyle)

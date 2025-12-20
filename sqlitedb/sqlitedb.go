@@ -21,6 +21,11 @@ func NewHandler(embedSchema, dbPath string) (*Handler, error) {
 		return nil, fmt.Errorf("opening db: %w", err)
 	}
 
+	// Enable foreign key constraints
+	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
+		return nil, fmt.Errorf("enabling foreign keys: %w", err)
+	}
+
 	q := New(db)
 	return &Handler{
 		embedSchema: embedSchema,
@@ -43,7 +48,7 @@ func (h *Handler) Close() error {
 
 func NewRepos(q *Queries) *models.AllRepos {
 	return &models.AllRepos{
-		Tasks: NewTaskRepo(q),
-		Lists: NewListRepo(q),
+		Tasks:    NewTaskRepo(q),
+		Projects: NewProjectRepo(q),
 	}
 }

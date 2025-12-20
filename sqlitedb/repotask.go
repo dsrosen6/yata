@@ -25,8 +25,8 @@ func (tr *TaskRepo) ListAll(ctx context.Context) ([]*models.Task, error) {
 	return dbTaskSliceToTaskSlice(dt), nil
 }
 
-func (tr *TaskRepo) ListByListID(ctx context.Context, listID int64) ([]*models.Task, error) {
-	dt, err := tr.q.ListTasksByListID(ctx, &listID)
+func (tr *TaskRepo) ListByProjectID(ctx context.Context, projectID int64) ([]*models.Task, error) {
+	dt, err := tr.q.ListTasksByProjectID(ctx, &projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func taskToCreateParams(t *models.Task) *CreateTaskParams {
 	return &CreateTaskParams{
 		Title:        t.Title,
 		ParentTaskID: t.ParentTaskID,
-		ListID:       t.ListID,
+		ProjectID:    t.ProjectID,
 		Complete:     t.Complete,
 		DueAt:        t.DueAt,
 	}
@@ -88,7 +88,7 @@ func taskToUpdateParams(t *models.Task) *UpdateTaskParams {
 	return &UpdateTaskParams{
 		ID:           t.ID,
 		ParentTaskID: t.ParentTaskID,
-		ListID:       t.ListID,
+		ProjectID:    t.ProjectID,
 		Title:        t.Title,
 		Complete:     t.Complete,
 		DueAt:        t.DueAt,
@@ -109,7 +109,7 @@ func dbTaskToTask(d *Task) *models.Task {
 		ID:           d.ID,
 		Title:        d.Title,
 		ParentTaskID: d.ParentTaskID,
-		ListID:       d.ListID,
+		ProjectID:    d.ProjectID,
 		Complete:     d.Complete,
 		DueAt:        d.DueAt,
 		CreatedAt:    d.CreatedAt,

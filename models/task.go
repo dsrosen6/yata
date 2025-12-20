@@ -9,7 +9,7 @@ type Task struct {
 	ID           int64
 	Title        string
 	ParentTaskID *int64
-	ListID       *int64
+	ProjectID    *int64
 	Complete     bool
 	DueAt        *time.Time
 	CreatedAt    time.Time
@@ -18,7 +18,7 @@ type Task struct {
 
 type TaskRepo interface {
 	ListAll(ctx context.Context) ([]*Task, error)
-	ListByListID(ctx context.Context, listID int64) ([]*Task, error)
+	ListByProjectID(ctx context.Context, projectID int64) ([]*Task, error)
 	ListByParentID(ctx context.Context, parentID int64) ([]*Task, error)
 	Get(ctx context.Context, id int64) (*Task, error)
 	Create(ctx context.Context, t *Task) (*Task, error)

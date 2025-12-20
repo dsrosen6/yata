@@ -10,30 +10,44 @@ import (
 	"github.com/dsrosen6/yata/tui/models/form"
 )
 
-func (m *model) refreshTasks() tea.Cmd {
+func (m *model) refreshTasks(projectID int64) tea.Cmd {
 	return func() tea.Msg {
-		// before wiping and refreshing, get current index
-		currentIndex := m.taskList.Index()
-		tasks, err := m.stores.Tasks.ListAll(context.Background())
+		ctx := context.Background()
+		if m.currentProjectID == 0 {
+			// before wiping and refreshing, get current index
+			currentIndex := m.taskList.Index()
+			tasks, err := m.stores.Tasks.ListAll(ctx)
+			if err != nil {
+				return storeErrorMsg{err}
+			}
+			items := append([]list.Item{}, tasksToItems(tasks)...)
+			cmd := m.taskList.SetItems(items)
+			if currentIndex >= len(items) && len(items) > 0 {
+				m.taskList.Select(len(items) - 1)
+			}
+			return cmd
+		}
+
+		tasks, err := m.stores.Tasks.ListByProjectID(ctx, projectID)
 		if err != nil {
 			return storeErrorMsg{err}
 		}
 		items := append([]list.Item{}, tasksToItems(tasks)...)
-		cmd := m.taskList.SetItems(items)
-		if currentIndex >= len(items) && len(items) > 0 {
-			m.taskList.Select(len(items) - 1)
-		}
-		return cmd
+		return m.taskList.SetItems(items)
 	}
 }
 
-func (m *model) insertTask(t taskItem) tea.Cmd {
+func (m *model) insertTask(t taskItem, projectID int64) tea.Cmd {
 	return func() tea.Msg {
+		if projectID != 0 {
+			t.ProjectID = &projectID
+		}
+
 		if _, err := m.stores.Tasks.Create(context.Background(), t.Task); err != nil {
 			return storeErrorMsg{err}
 		}
 
-		return tea.BatchMsg{m.refreshTasks(), m.taskEntryForm.Reset()}
+		return tea.BatchMsg{m.refreshTasks(projectID), m.taskEntryForm.Reset()}
 	}
 }
 
