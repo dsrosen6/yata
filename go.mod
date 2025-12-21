@@ -6,7 +6,6 @@ require (
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/dsrosen6/tea-flexbox v0.0.0-20251218190946-a344d55cd751
 	modernc.org/sqlite v1.40.1
 )
 

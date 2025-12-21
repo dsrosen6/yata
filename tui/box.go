@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/dsrosen6/tea-flexbox/titlebox"
+import "github.com/dsrosen6/yata/tui/render/titlebox"
 
 func (m *model) createTasksBox() titlebox.Box {
 	boxStyle := allStyles.unfocusedBoxStyle

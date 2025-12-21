@@ -7,9 +7,9 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-	fbox "github.com/dsrosen6/tea-flexbox"
 	"github.com/dsrosen6/yata/models"
 	"github.com/dsrosen6/yata/tui/models/form"
+	fbox "github.com/dsrosen6/yata/tui/render/flexbox"
 )
 
 type (
@@ -88,8 +88,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.deleteProject(m.selectedProjectID())
 				}
 			}
-
-		// focus-switching binds
+		case key.Matches(msg, m.keys.focusPanelLeft):
+			if m.currentFocus == focusTasks {
+				m.currentFocus = focusProjects
+			}
+		case key.Matches(msg, m.keys.focusPanelRight):
+			if m.currentFocus == focusProjects {
+				m.currentFocus = focusTasks
+			}
 		case key.Matches(msg, m.keys.focusProjects):
 			if !m.currentFocus.isEntry() {
 				m.currentFocus = focusProjects
@@ -98,13 +104,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.currentFocus.isEntry() {
 				m.currentFocus = focusTasks
 			}
-		case key.Matches(msg, m.keys.newProject):
-			if !m.currentFocus.isEntry() {
+		case key.Matches(msg, m.keys.newItem):
+			switch m.currentFocus {
+			case focusProjects:
 				m.currentFocus = focusProjectEntry
 				return m, m.projectEntryForm.Init()
-			}
-		case key.Matches(msg, m.keys.newTask):
-			if !m.currentFocus.isEntry() {
+			case focusTasks:
 				m.currentFocus = focusTaskEntry
 				return m, m.taskEntryForm.Init()
 			}
@@ -221,7 +226,7 @@ func (m *model) View() string {
 
 	topBox := fbox.New(fbox.Horizontal, 4).
 		AddTitleBox(m.createProjectsBox(), 1, nil).
-		AddTitleBox(m.createTasksBox(), 10, nil)
+		AddTitleBox(m.createTasksBox(), 8, nil)
 
 	fl := fbox.New(fbox.Vertical, 1).
 		AddFlexBox(topBox, 7, nil).
