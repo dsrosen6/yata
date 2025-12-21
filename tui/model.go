@@ -110,23 +110,39 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case refreshTasksMsg:
-		return m, m.getUpdatedTasks(m.currentProjectID)
+		return m, m.getUpdatedTasks(m.currentProjectID, msg.selectTaskID)
 
 	case gotUpdatedTasksMsg:
-		return m, tea.Batch(
+		cmds := []tea.Cmd{
 			m.taskList.SetItems(msg.tasks),
 			m.adjustTaskListIndex(),
-		)
+		}
+
+		if msg.selectTaskID != 0 {
+			cmds = append(cmds, m.selectTask(msg.selectTaskID))
+		}
+
+		return m, tea.Batch(cmds...)
 
 	case refreshProjectsMsg:
-		return m, m.refreshProjects()
+		// Some commands that refresh the projects list will provide a
+		// selected project ID. This is for cases like adding a project.
+		// The project ID is passed down the command chain and then it is
+		// set as the selected project once it reaches the end.
+		return m, m.refreshProjects(msg.selectProjectID)
 
 	case gotUpdatedProjectsMsg:
-		return m, tea.Batch(
+		cmds := []tea.Cmd{
 			m.projectList.SetItems(msg.projects),
 			m.checkProjectChanged(),
 			m.adjustProjectListIndex(),
-		)
+		}
+
+		if msg.selectProjectID != 0 {
+			cmds = append(cmds, m.selectProject(msg.selectProjectID))
+		}
+
+		return m, tea.Batch(cmds...)
 	}
 
 	switch m.currentFocus {
@@ -161,10 +177,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentFocus = focusTasks
 				return m, m.taskEntryForm.Reset()
 			}
+
 		case form.ResultMsg:
 			m.currentFocus = focusTasks
 			t := taskFromInputResult(msg.Result)
-			return m, tea.Batch(m.insertTask(t, m.currentProjectID), m.taskEntryForm.Reset())
+			return m, tea.Batch(
+				m.insertTask(t, m.currentProjectID),
+				m.taskEntryForm.Reset(),
+			)
 		}
 		return m, cmd
 
@@ -179,10 +199,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentFocus = focusProjects
 				return m, m.projectEntryForm.Reset()
 			}
+
 		case form.ResultMsg:
 			m.currentFocus = focusProjects
 			p := projectFromInputResult(msg.Result)
-			return m, m.insertProject(p)
+			return m, tea.Batch(
+				m.insertProject(p),
+				m.projectEntryForm.Reset(),
+			)
 		}
 		return m, cmd
 	}

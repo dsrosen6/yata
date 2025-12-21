@@ -13,8 +13,11 @@ import (
 )
 
 type (
-	refreshProjectsMsg    struct{}
-	gotUpdatedProjectsMsg struct{ projects []list.Item }
+	refreshProjectsMsg    struct{ selectProjectID int64 }
+	gotUpdatedProjectsMsg struct {
+		projects        []list.Item
+		selectProjectID int64
+	}
 )
 
 func (m *model) checkProjectChanged() tea.Cmd {
@@ -22,10 +25,20 @@ func (m *model) checkProjectChanged() tea.Cmd {
 		sel := m.selectedProjectID()
 		if m.currentProjectID != sel {
 			m.currentProjectID = sel
-			return refreshTasksMsg{}
+			return refreshTasksMsg{selectTaskID: 0}
 		}
 		return nil
 	}
+}
+
+func (m *model) selectProject(id int64) tea.Cmd {
+	for i, item := range m.projectList.Items() {
+		if p, ok := item.(taskProjectItem); ok && p.ID == id {
+			m.projectList.Select(i)
+			break
+		}
+	}
+	return nil
 }
 
 func (m *model) adjustProjectListIndex() tea.Cmd {
@@ -36,24 +49,28 @@ func (m *model) adjustProjectListIndex() tea.Cmd {
 	return nil
 }
 
-func (m *model) refreshProjects() tea.Cmd {
+func (m *model) refreshProjects(selectProjectID int64) tea.Cmd {
 	return func() tea.Msg {
 		projects, err := m.stores.Projects.ListAll(context.Background())
 		if err != nil {
 			return storeErrorMsg{err}
 		}
 		items := append([]list.Item{}, projectsToItems(projects)...)
-		return gotUpdatedProjectsMsg{projects: items}
+		return gotUpdatedProjectsMsg{
+			projects:        items,
+			selectProjectID: selectProjectID,
+		}
 	}
 }
 
 func (m *model) insertProject(p taskProjectItem) tea.Cmd {
 	return func() tea.Msg {
-		if _, err := m.stores.Projects.Create(context.Background(), p.Project); err != nil {
+		created, err := m.stores.Projects.Create(context.Background(), p.Project)
+		if err != nil {
 			return storeErrorMsg{err}
 		}
 
-		return refreshProjectsMsg{}
+		return refreshProjectsMsg{selectProjectID: created.ID}
 	}
 }
 
@@ -63,7 +80,7 @@ func (m *model) deleteProject(id int64) tea.Cmd {
 			return storeErrorMsg{err}
 		}
 
-		return refreshProjectsMsg{}
+		return refreshProjectsMsg{selectProjectID: 0}
 	}
 }
 
