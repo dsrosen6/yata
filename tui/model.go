@@ -28,6 +28,13 @@ type (
 	}
 )
 
+type dimensions struct {
+	totalWidth          int
+	totalHeight         int
+	projectBoxWidth     int
+	projectDelegateMaxW int
+}
+
 func initialModel(stores *models.AllRepos) (*model, error) {
 	te, err := newTaskEntryForm()
 	if err != nil {
@@ -64,12 +71,24 @@ func (m *model) Init() tea.Cmd {
 	return nil
 }
 
+func (m *model) calculateDimensions(msg tea.WindowSizeMsg) dimensions {
+	d := &dimensions{}
+	d.totalWidth = msg.Width
+	d.totalHeight = msg.Height
+	f, _ := m.createProjectsBox().FrameSize()
+
+	d.projectBoxWidth = 15
+	d.projectDelegateMaxW = d.projectBoxWidth - f
+	return *d
+}
+
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		m.dimensions = m.calculateDimensions(msg)
+		m.projectList.SetDelegate(projectItemDelegate{maxWidth: m.projectDelegateMaxW})
+
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.quit):
@@ -220,18 +239,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	if m.width == 0 || m.height == 0 {
+	if m.totalWidth == 0 || m.totalHeight == 0 {
 		return "Initializing..."
 	}
 
 	topBox := fbox.New(fbox.Horizontal, 4).
-		AddTitleBox(m.createProjectsBox(), 1, nil).
-		AddTitleBox(m.createTasksBox(), 8, nil)
+		AddTitleBox(m.createProjectsBox(), 1, fbox.FixedSize(m.projectBoxWidth), nil, nil).
+		AddTitleBox(m.createTasksBox(), 8, nil, nil, nil)
 
 	fl := fbox.New(fbox.Vertical, 1).
-		AddFlexBox(topBox, 7, nil).
-		AddTitleBox(m.createTaskEntryBox(), 1, func() bool { return m.currentFocus == focusTaskEntry }).
-		AddTitleBox(m.createProjectEntryBox(), 1, func() bool { return m.currentFocus == focusProjectEntry })
+		AddFlexBox(topBox, 7, nil, nil, nil).
+		AddTitleBox(m.createTaskEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusTaskEntry }).
+		AddTitleBox(m.createProjectEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusProjectEntry })
 
-	return fl.Render(m.width, m.height)
+	return fl.Render(m.totalWidth, m.totalHeight)
 }

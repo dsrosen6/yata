@@ -6,14 +6,15 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/dsrosen6/yata/models"
 )
 
 type (
-	taskItem             struct{ *models.Task }
-	taskProjectItem      struct{ *models.Project }
-	taskItemDelegate     struct{}
-	projectItemDelegate  struct{}
+	taskItem            struct{ *models.Task }
+	taskProjectItem     struct{ *models.Project }
+	taskItemDelegate    struct{}
+	projectItemDelegate struct{ maxWidth int }
 )
 
 func (d taskItemDelegate) Height() int {
@@ -77,9 +78,30 @@ func (d projectItemDelegate) Render(w io.Writer, m list.Model, index int, listIt
 		fn = allStyles.focusedTextStyle.Render
 	}
 	str := fmt.Sprintf("%s%s", prepend, i.Title)
+	if lipgloss.Width(str) > d.maxWidth {
+		if d.maxWidth < 4 {
+			// too narrow for ellipsis and prepend string, just truncate
+			str = truncateToWidth(str, d.maxWidth)
+		} else {
+			str = truncateToWidth(str, d.maxWidth-3) + "..."
+		}
+	}
 	_, _ = fmt.Fprint(w, fn(str))
 }
 
 func (p taskProjectItem) FilterValue() string {
 	return p.Title
+}
+
+func truncateToWidth(s string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+
+	runes := []rune(s)
+	if len(runes) <= width {
+		return s
+	}
+
+	return string(runes[:width])
 }

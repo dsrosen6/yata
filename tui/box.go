@@ -11,7 +11,7 @@ func (m *model) createTasksBox() titlebox.Box {
 	}
 
 	return titlebox.New().
-		SetTitle("[2]tasks").
+		SetTitle("tasks").
 		SetBody(m.taskList.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
 		SetBoxStyle(boxStyle.Padding(0, 1)).
@@ -27,7 +27,7 @@ func (m *model) createProjectsBox() titlebox.Box {
 	}
 
 	return titlebox.New().
-		SetTitle("[1]projects").
+		SetTitle("projects").
 		SetBody(m.projectList.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
 		SetBoxStyle(boxStyle.Padding(0, 1)).

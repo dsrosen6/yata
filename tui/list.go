@@ -17,7 +17,7 @@ func initialTaskList(tasks []*models.Task) list.Model {
 
 func initialProjectList(projects []*models.Project) list.Model {
 	items := projectsToItems(projects)
-	ls := list.New(items, projectItemDelegate{}, 10, 10)
+	ls := list.New(items, projectItemDelegate{maxWidth: 20}, 10, 10)
 	ls.SetShowStatusBar(false)
 	ls.SetShowTitle(false)
 	ls.SetShowHelp(false)

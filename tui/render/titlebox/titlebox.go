@@ -105,8 +105,10 @@ func topBorder(align Alignment, width int, boxStyle, titleStyle lipgloss.Style, 
 	titleStr := titleStyle.Render(title)
 	titleW := lipgloss.Width(titleStr)
 
+	// If title won't fit, just render border without title
 	if titleW >= innerW {
-		return topLeft + titleStr[:innerW] + topRight
+		borderLine := styler(strings.Repeat(border.Top, innerW))
+		return topLeft + borderLine + topRight
 	}
 
 	leftFill := 0

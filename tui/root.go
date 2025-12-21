@@ -13,11 +13,6 @@ var allStyles styles
 type rootModel struct {
 	cfg       *config.Config
 	todoModel *model
-	dimensions
-}
-
-type dimensions struct {
-	width, height int
 }
 
 func Run(cfg *config.Config, stores *models.AllRepos) error {
@@ -51,13 +46,6 @@ func (m *rootModel) Init() tea.Cmd {
 
 func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-	}
-
 	var todoModel tea.Model
 	todoModel, cmd = m.todoModel.Update(msg)
 	m.todoModel = todoModel.(*model)
