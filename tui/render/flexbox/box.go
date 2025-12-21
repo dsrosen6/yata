@@ -26,18 +26,18 @@ func New(dir Direction, ratio int) *Box {
 	}
 }
 
-func (b *Box) AddTitleBox(box titlebox.Box, ratio int, showFunc func() bool) *Box {
-	it := TitleBoxToItem(box, ratio)
+func (b *Box) AddTitleBox(box titlebox.Box, ratio int, fixedW, fixedH *int, showFunc func() bool) *Box {
+	it := TitleBoxToItem(box, ratio, fixedW, fixedH)
 	return b.AddItem(it, showFunc)
 }
 
-func (b *Box) AddStyleBox(style lipgloss.Style, body string, ratio int, showFunc func() bool) *Box {
-	it := StyleToItem(style, body, ratio)
+func (b *Box) AddStyleBox(s lipgloss.Style, body string, ratio int, fixedW, fixedH *int, showFunc func() bool) *Box {
+	it := StyleToItem(s, body, ratio, fixedW, fixedH)
 	return b.AddItem(it, showFunc)
 }
 
-func (b *Box) AddFlexBox(box *Box, ratio int, showFunc func() bool) *Box {
-	it := FlexBoxToItem(box, ratio)
+func (b *Box) AddFlexBox(box *Box, ratio int, fixedW, fixedH *int, showFunc func() bool) *Box {
+	it := FlexBoxToItem(box, ratio, fixedW, fixedH)
 	return b.AddItem(it, showFunc)
 }
 
@@ -70,24 +70,7 @@ func (b *Box) Render(w, h int) string {
 		return ""
 	}
 
-	// Calculate total ratio and total frame size in main axis direction
-	totalRatio := 0
-	totalFrameMain := 0
-
-	for _, it := range b.Items {
-		totalRatio += it.Ratio
-		fw, fh := it.Node.FrameSize()
-		if b.Direction == Vertical {
-			totalFrameMain += fh // sum border heights
-		} else {
-			totalFrameMain += fw // some border widths
-		}
-	}
-
-	if totalRatio <= 0 {
-		return ""
-	}
-
+	// Determine main and cross sizes
 	mainSize := h
 	crossSize := w
 	if b.Direction == Horizontal {
@@ -95,36 +78,103 @@ func (b *Box) Render(w, h int) string {
 		crossSize = h
 	}
 
-	usableMain := mainSize - totalFrameMain
-	if usableMain <= 0 {
-		return ""
-	}
+	// First pass - calculate space allocation
+	totalRatio := 0
+	totalFrameMain := 0
+	fixedMainTotal := 0
+	lastFlexibleIdx := -1
 
-	out := make([]string, 0, len(b.Items))
-	used := 0
 	for i, it := range b.Items {
 		fw, fh := it.Node.FrameSize()
 
+		// add frame size for all items
+
+		if b.Direction == Vertical {
+			totalFrameMain += fh
+		} else {
+			totalFrameMain += fw
+		}
+
+		// check if this item has a fixed size in main direction
+		hasFixedM := false
+		if b.Direction == Vertical && it.FixedHeight != nil {
+			fixedMainTotal += *it.FixedHeight
+			hasFixedM = true
+		} else if b.Direction == Horizontal && it.FixedWidth != nil {
+			fixedMainTotal += *it.FixedWidth
+			hasFixedM = true
+		}
+
+		if !hasFixedM {
+			totalRatio += it.Ratio
+			lastFlexibleIdx = i
+		}
+	}
+
+	// calculate usable space for flexible items
+	usableM := mainSize - totalFrameMain - fixedMainTotal
+	if usableM < 0 {
+		usableM = 0
+	}
+
+	// second pass: render items
+	out := make([]string, 0, len(b.Items))
+	usedFlexible := 0
+	for i, it := range b.Items {
+		fw, fh := it.Node.FrameSize()
+
+		// calc cross size
+		// calc is short for calculate
 		itemCross := crossSize
 		if b.Direction == Vertical {
-			itemCross -= fw
+			// cross axis is width
+			if it.FixedWidth != nil {
+				itemCross = *it.FixedWidth
+			} else {
+				itemCross -= fw
+			}
 		} else {
-			itemCross -= fh
+			// cross axis is height
+			if it.FixedHeight != nil {
+				itemCross = *it.FixedHeight
+			} else {
+				itemCross -= fh
+			}
 		}
+
 		if itemCross <= 0 {
 			continue
 		}
 
-		itemMain := usableMain * it.Ratio / totalRatio
-		if i == len(b.Items)-1 {
-			itemMain = usableMain - used
+		// calculate main size
+		var itemMain int
+		isFixed := false
+		if b.Direction == Vertical && it.FixedHeight != nil {
+			itemMain = *it.FixedHeight
+			isFixed = true
+		} else if b.Direction == Horizontal && it.FixedWidth != nil {
+			itemMain = *it.FixedWidth
+			isFixed = true
+		}
+
+		if !isFixed {
+			// flexible item, use ratio
+			if totalRatio > 0 {
+				if i == lastFlexibleIdx {
+					// last flexible index gets remaining space
+					itemMain = usableM - usedFlexible
+				} else {
+					itemMain = usableM * it.Ratio / totalRatio
+				}
+				usedFlexible += itemMain
+			} else {
+				itemMain = 0
+			}
 		}
 
 		if itemMain < 0 {
 			itemMain = 0
 		}
-
-		used += itemMain
 
 		if b.Direction == Vertical {
 			out = append(out, it.Node.Render(itemCross, itemMain))
@@ -137,4 +187,10 @@ func (b *Box) Render(w, h int) string {
 		return lipgloss.JoinVertical(lipgloss.Top, out...)
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, out...)
+}
+
+// FixedSize is a helper function for passing fixed sizes to constructor funcs so
+// an extra line defining the int isn't necessary.
+func FixedSize(s int) *int {
+	return &s
 }

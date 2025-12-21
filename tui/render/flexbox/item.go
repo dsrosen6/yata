@@ -6,8 +6,10 @@ import (
 )
 
 type Item struct {
-	Ratio int
-	Node  Node
+	Ratio       int
+	FixedWidth  *int
+	FixedHeight *int
+	Node        Node
 }
 
 // Node represents a renderable component in the flexbox layout.
@@ -29,24 +31,30 @@ type StyleNode struct {
 	Body  string
 }
 
-func TitleBoxToItem(box titlebox.Box, ratio int) Item {
+func TitleBoxToItem(box titlebox.Box, ratio int, fixedW, fixedH *int) Item {
 	return Item{
-		Ratio: ratio,
-		Node:  box,
+		Ratio:       ratio,
+		FixedWidth:  fixedW,
+		FixedHeight: fixedH,
+		Node:        box,
 	}
 }
 
-func StyleToItem(style lipgloss.Style, body string, ratio int) Item {
+func StyleToItem(style lipgloss.Style, body string, ratio int, fixedW, fixedH *int) Item {
 	return Item{
-		Ratio: ratio,
-		Node:  NewStyleNode(style, body),
+		Ratio:       ratio,
+		FixedWidth:  fixedW,
+		FixedHeight: fixedH,
+		Node:        NewStyleNode(style, body),
 	}
 }
 
-func FlexBoxToItem(box *Box, ratio int) Item {
+func FlexBoxToItem(box *Box, ratio int, fixedW, fixedH *int) Item {
 	return Item{
-		Ratio: ratio,
-		Node:  box,
+		Ratio:       ratio,
+		FixedWidth:  fixedW,
+		FixedHeight: fixedH,
+		Node:        box,
 	}
 }
 
