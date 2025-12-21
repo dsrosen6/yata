@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	fbox "github.com/dsrosen6/tea-flexbox"
@@ -13,8 +14,8 @@ import (
 
 type (
 	model struct {
-		stores *models.AllRepos
-
+		stores           *models.AllRepos
+		keys             keyMap
 		taskList         list.Model
 		projectList      list.Model
 		taskEntryForm    *form.Model
@@ -25,15 +26,6 @@ type (
 
 		dimensions
 	}
-
-	focus int
-)
-
-const (
-	focusTasks focus = iota
-	focusProjects
-	focusTaskEntry
-	focusProjectEntry
 )
 
 func initialModel(stores *models.AllRepos) (*model, error) {
@@ -59,6 +51,7 @@ func initialModel(stores *models.AllRepos) (*model, error) {
 
 	return &model{
 		stores:           stores,
+		keys:             defaultKeyMap,
 		taskList:         initialTaskList(tasks),
 		projectList:      initialProjectList(projects),
 		taskEntryForm:    te,
@@ -68,7 +61,7 @@ func initialModel(stores *models.AllRepos) (*model, error) {
 }
 
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(m.refreshTasks(m.currentProjectID), m.taskEntryForm.Init())
+	return nil
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -78,67 +71,83 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tea.KeyMsg:
-		if m.currentFocus == focusTasks || m.currentFocus == focusProjects {
-			switch msg.String() {
-			case "q", "ctrl+c":
+		switch {
+		case key.Matches(msg, m.keys.quit):
+			if !m.currentFocus.isEntry() {
 				return m, tea.Quit
 			}
+		case key.Matches(msg, m.keys.delete):
+			switch m.currentFocus {
+			case focusTasks:
+				if len(m.taskList.Items()) > 0 {
+					return m, m.deleteTask(m.selectedTaskID())
+				}
+			case focusProjects:
+				// Don't allow deleting the "all" entry (which has ID 0)
+				if len(m.projectList.Items()) > 0 && m.selectedProjectID() != 0 {
+					return m, m.deleteProject(m.selectedProjectID())
+				}
+			}
+
+		// focus-switching binds
+		case key.Matches(msg, m.keys.focusProjects):
+			if !m.currentFocus.isEntry() {
+				m.currentFocus = focusProjects
+			}
+		case key.Matches(msg, m.keys.focusTasks):
+			if !m.currentFocus.isEntry() {
+				m.currentFocus = focusTasks
+			}
+		case key.Matches(msg, m.keys.newProject):
+			if !m.currentFocus.isEntry() {
+				m.currentFocus = focusProjectEntry
+				return m, m.projectEntryForm.Init()
+			}
+		case key.Matches(msg, m.keys.newTask):
+			if !m.currentFocus.isEntry() {
+				m.currentFocus = focusTaskEntry
+				return m, m.taskEntryForm.Init()
+			}
 		}
+	case refreshTasksMsg:
+		return m, m.getUpdatedTasks(m.currentProjectID)
+
+	case gotUpdatedTasksMsg:
+		return m, tea.Batch(
+			m.taskList.SetItems(msg.tasks),
+			m.adjustTaskListIndex(),
+		)
+
+	case refreshProjectsMsg:
+		return m, m.refreshProjects()
+
+	case gotUpdatedProjectsMsg:
+		return m, tea.Batch(
+			m.projectList.SetItems(msg.projects),
+			m.checkProjectChanged(),
+			m.adjustProjectListIndex(),
+		)
 	}
 
 	switch m.currentFocus {
 	case focusTasks:
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
-			switch msg.String() {
-			case "enter", " ":
+			switch {
+			case key.Matches(msg, m.keys.toggleTaskComplete):
 				if len(m.taskList.Items()) > 0 {
 					return m, m.toggleTaskComplete(m.selectedTask())
 				}
-			case "x":
-				if len(m.taskList.Items()) > 0 {
-					return m, m.deleteTask(m.selectedTaskID())
-				}
-			case "a":
-				m.currentFocus = focusTaskEntry
-				return m, m.taskEntryForm.Init()
-			case "1":
-				m.currentFocus = focusProjects
 			}
 			m.taskList, cmd = m.taskList.Update(msg)
 			return m, cmd
-		case refreshTasksMsg:
-			return m, m.refreshTasks(m.currentProjectID)
 		}
+
 	case focusProjects:
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
-			switch msg.String() {
-			case "x":
-				// Don't allow deleting the "all" entry (which has ID 0)
-				if len(m.projectList.Items()) > 0 && m.selectedProjectID() != 0 {
-					return m, m.deleteProject(m.selectedProjectID())
-				}
-			case "a":
-				m.currentFocus = focusProjectEntry
-				return m, m.projectEntryForm.Init()
-			case "2":
-				m.currentFocus = focusTasks
-			}
-			oldPjID := m.selectedProjectID()
 			m.projectList, cmd = m.projectList.Update(msg)
-			newPjID := m.selectedProjectID()
-			if oldPjID != newPjID {
-				m.currentProjectID = newPjID
-				return m, tea.Batch(cmd, m.refreshTasks(m.currentProjectID))
-			}
-
-			return m, cmd
-		case refreshProjectsMsg:
-			return m, tea.Batch()
-		case projectsRefreshedMsg:
-			m.currentProjectID = m.selectedProjectID()
-			return m, m.refreshTasks(m.currentProjectID)
+			return m, tea.Batch(cmd, m.checkProjectChanged())
 		}
 
 	case focusTaskEntry:
@@ -147,15 +156,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
-			switch msg.String() {
-			case "esc":
+			switch {
+			case key.Matches(msg, m.keys.cancelEntry):
 				m.currentFocus = focusTasks
 				return m, m.taskEntryForm.Reset()
 			}
 		case form.ResultMsg:
 			m.currentFocus = focusTasks
 			t := taskFromInputResult(msg.Result)
-			return m, m.insertTask(t, m.currentProjectID)
+			return m, tea.Batch(m.insertTask(t, m.currentProjectID), m.taskEntryForm.Reset())
 		}
 		return m, cmd
 
@@ -165,8 +174,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
-			switch msg.String() {
-			case "esc":
+			switch {
+			case key.Matches(msg, m.keys.cancelEntry):
 				m.currentFocus = focusProjects
 				return m, m.projectEntryForm.Reset()
 			}

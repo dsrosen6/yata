@@ -12,29 +12,38 @@ import (
 	"github.com/dsrosen6/yata/tui/models/form"
 )
 
-func projectsToItems(projects []*models.Project) []list.Item {
-	// Start with the static "all" entry
-	items := []list.Item{taskProjectItem{&models.Project{Title: "all"}}}
-	for _, p := range projects {
-		items = append(items, taskProjectItem{p})
+type (
+	refreshProjectsMsg    struct{}
+	gotUpdatedProjectsMsg struct{ projects []list.Item }
+)
+
+func (m *model) checkProjectChanged() tea.Cmd {
+	return func() tea.Msg {
+		sel := m.selectedProjectID()
+		if m.currentProjectID != sel {
+			m.currentProjectID = sel
+			return refreshTasksMsg{}
+		}
+		return nil
 	}
-	return items
+}
+
+func (m *model) adjustProjectListIndex() tea.Cmd {
+	currentIndex := m.projectList.Index()
+	if currentIndex >= len(m.projectList.Items()) && len(m.projectList.Items()) > 0 {
+		m.projectList.Select(len(m.projectList.Items()) - 1)
+	}
+	return nil
 }
 
 func (m *model) refreshProjects() tea.Cmd {
 	return func() tea.Msg {
-		currentIndex := m.projectList.Index()
 		projects, err := m.stores.Projects.ListAll(context.Background())
 		if err != nil {
 			return storeErrorMsg{err}
 		}
 		items := append([]list.Item{}, projectsToItems(projects)...)
-		cmd := m.projectList.SetItems(items)
-		if currentIndex >= len(items) && len(items) > 0 {
-			m.projectList.Select(len(items) - 1)
-		}
-		refreshedCmd := func() tea.Msg { return projectsRefreshedMsg{} }
-		return tea.Sequence(cmd, refreshedCmd)
+		return gotUpdatedProjectsMsg{projects: items}
 	}
 }
 
@@ -56,14 +65,6 @@ func (m *model) deleteProject(id int64) tea.Cmd {
 
 		return refreshProjectsMsg{}
 	}
-}
-
-func (m *model) selectedProject() taskProjectItem {
-	item := m.projectList.SelectedItem()
-	if item == nil {
-		return taskProjectItem{}
-	}
-	return item.(taskProjectItem)
 }
 
 func (m *model) selectedProjectID() int64 {
@@ -121,4 +122,13 @@ func projectFromInputResult(r form.Result) taskProjectItem {
 			Title: t,
 		},
 	}
+}
+
+func projectsToItems(projects []*models.Project) []list.Item {
+	// Start with the static "all" entry
+	items := []list.Item{taskProjectItem{&models.Project{Title: "all"}}}
+	for _, p := range projects {
+		items = append(items, taskProjectItem{p})
+	}
+	return items
 }
