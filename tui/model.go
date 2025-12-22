@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,6 +17,8 @@ type (
 	model struct {
 		stores           *models.AllRepos
 		keys             keyMap
+		help             help.Model
+		showHelp         bool
 		taskList         list.Model
 		projectList      list.Model
 		taskEntryForm    *form.Model
@@ -59,6 +62,8 @@ func initialModel(stores *models.AllRepos) (*model, error) {
 	return &model{
 		stores:           stores,
 		keys:             defaultKeyMap,
+		help:             help.New(),
+		showHelp:         true,
 		taskList:         initialTaskList(tasks),
 		projectList:      initialProjectList(projects),
 		taskEntryForm:    te,
@@ -95,6 +100,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.currentFocus.isEntry() {
 				return m, tea.Quit
 			}
+		case key.Matches(msg, m.keys.toggleHelp):
+			if !m.currentFocus.isEntry() {
+				m.showHelp = !m.showHelp
+			}
 		case key.Matches(msg, m.keys.delete):
 			switch m.currentFocus {
 			case focusTasks:
@@ -107,11 +116,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.deleteProject(m.selectedProjectID())
 				}
 			}
-		case key.Matches(msg, m.keys.focusPanelLeft):
+		case key.Matches(msg, m.keys.focusProjects):
 			if m.currentFocus == focusTasks {
 				m.currentFocus = focusProjects
 			}
-		case key.Matches(msg, m.keys.focusPanelRight):
+		case key.Matches(msg, m.keys.focusTasks):
 			if m.currentFocus == focusProjects {
 				m.currentFocus = focusTasks
 			}
@@ -247,10 +256,12 @@ func (m *model) View() string {
 		AddTitleBox(m.createProjectsBox(), 1, fbox.FixedSize(m.projectBoxWidth), nil, nil).
 		AddTitleBox(m.createTasksBox(), 8, nil, nil, nil)
 
+	hv := m.help.ShortHelpView(m.helpKeys())
 	fl := fbox.New(fbox.Vertical, 1).
 		AddFlexBox(topBox, 7, nil, nil, nil).
 		AddTitleBox(m.createTaskEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusTaskEntry }).
-		AddTitleBox(m.createProjectEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusProjectEntry })
+		AddTitleBox(m.createProjectEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusProjectEntry }).
+		AddStyleBox(helpStyle, hv, 1, nil, fbox.FixedSize(1), func() bool { return m.showHelp })
 
 	return fl.Render(m.totalWidth, m.totalHeight)
 }
