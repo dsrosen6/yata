@@ -85,16 +85,25 @@ func (m *model) deleteProject(id int64) tea.Cmd {
 }
 
 func (m *model) selectedProjectID() int64 {
-	item := m.projectList.SelectedItem()
-	if item == nil {
-		return 0
-	}
-	sel := item.(taskProjectItem)
-	if sel.Project == nil {
+	sel := m.selectedProject()
+	if sel == nil {
 		return 0
 	}
 
 	return sel.ID
+}
+
+func (m *model) selectedProject() *taskProjectItem {
+	item := m.projectList.SelectedItem()
+	if item == nil {
+		return nil
+	}
+	sel := item.(taskProjectItem)
+	if sel.Project == nil {
+		return nil
+	}
+
+	return &sel
 }
 
 func newProjectEntryForm() (*form.Model, error) {

@@ -149,10 +149,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := []tea.Cmd{
 			m.taskList.SetItems(msg.tasks),
 			m.adjustTaskListIndex(),
-		}
-
-		if msg.selectTaskID != 0 {
-			cmds = append(cmds, m.selectTask(msg.selectTaskID))
+			m.selectTask(msg.selectTaskID),
 		}
 
 		return m, tea.Batch(cmds...)

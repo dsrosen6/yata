@@ -21,7 +21,13 @@ type (
 	}
 )
 
+// selectTask selects the task in the list with the provided ID. If no ID is provided,
+// it takes the 0 index.
 func (m *model) selectTask(id int64) tea.Cmd {
+	if id == 0 {
+		m.taskList.Select(0)
+	}
+
 	for i, item := range m.taskList.Items() {
 		if t, ok := item.(taskItem); ok && t.ID == id {
 			m.taskList.Select(i)
@@ -31,6 +37,9 @@ func (m *model) selectTask(id int64) tea.Cmd {
 	return nil
 }
 
+// adjustTaskListIndex is a safeguard for when the selected index of a task list becomes
+// higher than total items. For example, when you delete the last item in the list, it shifts
+// the selected index to the new last item in the list.
 func (m *model) adjustTaskListIndex() tea.Cmd {
 	currentIndex := m.taskList.Index()
 	if currentIndex >= len(m.taskList.Items()) && len(m.taskList.Items()) > 0 {
@@ -39,6 +48,9 @@ func (m *model) adjustTaskListIndex() tea.Cmd {
 	return nil
 }
 
+// getUpdatedTasks retrieves tasks from the store and returns a gotUpdatedTasksMsg with those tasks,
+// which will later be used to update the visible list. It takes a project ID to filter by project,
+// and a task ID to be later used to select the proper task once refreshed.
 func (m *model) getUpdatedTasks(projectID, selectTaskID int64) tea.Cmd {
 	return func() tea.Msg {
 		var (
@@ -47,6 +59,8 @@ func (m *model) getUpdatedTasks(projectID, selectTaskID int64) tea.Cmd {
 		)
 
 		ctx := context.Background()
+
+		// if no project ID is provided, assume the "all" view in the projects list is selected
 		if m.currentProjectID == 0 {
 			tasks, err = m.stores.Tasks.ListAll(ctx)
 		} else {
