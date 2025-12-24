@@ -132,15 +132,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.currentFocus.isEntry() {
 				m.currentFocus = focusTasks
 			}
-		case key.Matches(msg, m.keys.newItem):
-			switch m.currentFocus {
-			case focusProjects:
-				m.currentFocus = focusProjectEntry
-				return m, m.projectEntryForm.Init()
-			case focusTasks:
-				m.currentFocus = focusTaskEntry
-				return m, m.taskEntryForm.Init()
-			}
+		case key.Matches(msg, m.keys.newTask):
+			m.currentFocus = focusTaskEntry
+			return m, m.taskEntryForm.Init()
+		case key.Matches(msg, m.keys.newProject):
+			m.currentFocus = focusProjectEntry
+			return m, m.projectEntryForm.Init()
 		}
 	case refreshTasksMsg:
 		return m, m.getUpdatedTasks(m.currentProjectID, msg.selectTaskID)

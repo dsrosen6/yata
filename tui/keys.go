@@ -16,7 +16,8 @@ type navigationKeys struct {
 	focusProjects      key.Binding
 	focusTasks         key.Binding
 	delete             key.Binding
-	newItem            key.Binding
+	newTask            key.Binding
+	newProject         key.Binding
 	toggleTaskComplete key.Binding
 }
 
@@ -43,20 +44,24 @@ var defaultNavKeys = navigationKeys{
 		key.WithKeys("H"),
 	),
 	focusProjects: key.NewBinding(
-		key.WithKeys("h", "left"),
-		key.WithHelp("h/left", "focus projects"),
+		key.WithKeys("1"),
+		key.WithHelp("1", "focus projects"),
 	),
 	focusTasks: key.NewBinding(
-		key.WithKeys("l", "right"),
-		key.WithHelp("l/right", "focus tasks"),
+		key.WithKeys("2", "focus tasks"),
+		key.WithHelp("2", "focus tasks"),
 	),
 	delete: key.NewBinding(
 		key.WithKeys("x"),
 		key.WithHelp("x", "delete"),
 	),
-	newItem: key.NewBinding(
-		key.WithKeys("a"),
-		key.WithHelp("a", "new"),
+	newTask: key.NewBinding(
+		key.WithKeys("n"),
+		key.WithHelp("n", "new task"),
+	),
+	newProject: key.NewBinding(
+		key.WithKeys("N"),
+		key.WithHelp("N", "new project"),
 	),
 	toggleTaskComplete: key.NewBinding(
 		key.WithKeys(" "),
@@ -90,15 +95,13 @@ func (m *model) helpKeys() []key.Binding {
 		return []key.Binding{m.keys.cancelEntry, m.keys.submit}
 	}
 
-	var k []key.Binding
+	k := []key.Binding{m.keys.newTask, m.keys.newProject}
 	switch m.currentFocus {
 	case focusProjects:
-		k = append(k, m.keys.focusTasks, m.keys.newItem)
 		if m.selectedProjectID() != 0 {
 			k = append(k, m.keys.delete)
 		}
 	case focusTasks:
-		k = append(k, m.keys.focusProjects, m.keys.newItem)
 		if m.selectedTaskID() != 0 {
 			tc := taskCompleteHelp(m.keys.toggleTaskComplete, m.selectedTask().Complete)
 			k = append(k, tc, m.keys.delete)

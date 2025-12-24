@@ -2,22 +2,6 @@ package tui
 
 import "github.com/dsrosen6/yata/tui/render/titlebox"
 
-func (m *model) createTasksBox() titlebox.Box {
-	boxStyle := allStyles.unfocusedBoxStyle
-	titleStyle := allStyles.unfocusedBoxTitleStyle
-	if m.currentFocus == focusTasks {
-		boxStyle = allStyles.focusedBoxStyle
-		titleStyle = allStyles.focusedBoxTitleStyle
-	}
-
-	return titlebox.New().
-		SetTitle("tasks").
-		SetBody(m.taskList.View()).
-		SetTitleAlignment(titlebox.AlignLeft).
-		SetBoxStyle(boxStyle.Padding(0, 1)).
-		SetTitleStyle(titleStyle)
-}
-
 func (m *model) createProjectsBox() titlebox.Box {
 	boxStyle := allStyles.unfocusedBoxStyle
 	titleStyle := allStyles.unfocusedBoxTitleStyle
@@ -26,9 +10,31 @@ func (m *model) createProjectsBox() titlebox.Box {
 		titleStyle = allStyles.focusedBoxTitleStyle
 	}
 
+	border := boxStyle.GetBorderStyle().Top
+	title := "[1]" + border + "projects"
+
 	return titlebox.New().
-		SetTitle("projects").
+		SetTitle(title).
 		SetBody(m.projectList.View()).
+		SetTitleAlignment(titlebox.AlignLeft).
+		SetBoxStyle(boxStyle.Padding(0, 1)).
+		SetTitleStyle(titleStyle)
+}
+
+func (m *model) createTasksBox() titlebox.Box {
+	boxStyle := allStyles.unfocusedBoxStyle
+	titleStyle := allStyles.unfocusedBoxTitleStyle
+	if m.currentFocus == focusTasks {
+		boxStyle = allStyles.focusedBoxStyle
+		titleStyle = allStyles.focusedBoxTitleStyle
+	}
+
+	border := boxStyle.GetBorderStyle().Top
+	title := "[2]" + border + "tasks"
+
+	return titlebox.New().
+		SetTitle(title).
+		SetBody(m.taskList.View()).
 		SetTitleAlignment(titlebox.AlignLeft).
 		SetBoxStyle(boxStyle.Padding(0, 1)).
 		SetTitleStyle(titleStyle)
