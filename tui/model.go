@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/dsrosen6/yata/models"
 	"github.com/dsrosen6/yata/tui/models/form"
 	fbox "github.com/dsrosen6/yata/tui/render/flexbox"
@@ -29,6 +30,8 @@ type (
 
 		dimensions
 	}
+
+	dimensionsCalculatedMsg struct{ dimensions }
 )
 
 type dimensions struct {
@@ -36,6 +39,7 @@ type dimensions struct {
 	totalHeight         int
 	projectBoxWidth     int
 	projectDelegateMaxW int
+	listsHeight         int
 }
 
 func initialModel(stores *models.AllRepos) (*model, error) {
@@ -76,23 +80,40 @@ func (m *model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *model) calculateDimensions(msg tea.WindowSizeMsg) dimensions {
-	d := &dimensions{}
-	d.totalWidth = msg.Width
-	d.totalHeight = msg.Height
-	f, _ := m.createProjectsBox().FrameSize()
+func (m *model) calculateDimensions(w, h int) tea.Cmd {
+	return func() tea.Msg {
+		d := &dimensions{}
+		d.totalWidth = w
+		d.totalHeight = h
+		tb := m.createTopBox()
+		fw, fh := tb.GetAllItemsFrameSize()
 
-	d.projectBoxWidth = 15
-	d.projectDelegateMaxW = d.projectBoxWidth - f
-	return *d
+		_, tbh := lipgloss.Size(tb.Render(d.totalWidth, d.totalHeight))
+
+		listH := tbh - fh
+		if m.showHelp {
+			hh := lipgloss.Height(m.help.ShortHelpView(m.helpKeys()))
+			listH = listH - hh
+		}
+
+		d.projectBoxWidth = 15
+		d.projectDelegateMaxW = d.projectBoxWidth - fw
+
+		d.listsHeight = listH
+		return dimensionsCalculatedMsg{*d}
+	}
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.dimensions = m.calculateDimensions(msg)
+		return m, m.calculateDimensions(msg.Width, msg.Height)
+	case dimensionsCalculatedMsg:
+		m.dimensions = msg.dimensions
 		m.projectList.SetDelegate(projectItemDelegate{maxWidth: m.projectDelegateMaxW})
+		m.projectList.SetHeight(m.listsHeight)
+		m.taskList.SetHeight(m.listsHeight)
 
 	case tea.KeyMsg:
 		switch {
@@ -117,14 +138,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, m.keys.focusProjects):
-			if m.currentFocus == focusTasks {
-				m.currentFocus = focusProjects
-			}
-		case key.Matches(msg, m.keys.focusTasks):
-			if m.currentFocus == focusProjects {
-				m.currentFocus = focusTasks
-			}
-		case key.Matches(msg, m.keys.focusProjects):
 			if !m.currentFocus.isEntry() {
 				m.currentFocus = focusProjects
 			}
@@ -134,7 +147,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, m.keys.newTask):
 			m.currentFocus = focusTaskEntry
-			return m, m.taskEntryForm.Init()
+			return m, tea.Batch(m.taskEntryForm.Init(), m.calculateDimensions(m.totalWidth, m.totalHeight))
 		case key.Matches(msg, m.keys.newProject):
 			m.currentFocus = focusProjectEntry
 			return m, m.projectEntryForm.Init()
@@ -246,13 +259,9 @@ func (m *model) View() string {
 		return "Initializing..."
 	}
 
-	topBox := fbox.New(fbox.Horizontal, 4).
-		AddTitleBox(m.createProjectsBox(), 1, fbox.FixedSize(m.projectBoxWidth), nil, nil).
-		AddTitleBox(m.createTasksBox(), 8, nil, nil, nil)
-
 	hv := m.help.ShortHelpView(m.helpKeys())
 	fl := fbox.New(fbox.Vertical, 1).
-		AddFlexBox(topBox, 7, nil, nil, nil).
+		AddFlexBox(m.createTopBox(), 7, nil, nil, nil).
 		AddTitleBox(m.createTaskEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusTaskEntry }).
 		AddTitleBox(m.createProjectEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusProjectEntry }).
 		AddStyleBox(helpStyle, hv, 1, nil, fbox.FixedSize(1), func() bool { return m.showHelp })

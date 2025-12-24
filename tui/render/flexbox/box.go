@@ -65,6 +65,17 @@ func (b *Box) FrameSize() (int, int) {
 	return 0, 0
 }
 
+func (b *Box) GetAllItemsFrameSize() (int, int) {
+	var w, h int
+	for _, it := range b.Items {
+		fw, fh := it.Node.FrameSize()
+		w += fw
+		h += fh
+	}
+
+	return w, h
+}
+
 func (b *Box) Render(w, h int) string {
 	if len(b.Items) == 0 {
 		return ""

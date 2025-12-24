@@ -88,7 +88,7 @@ func (b Box) Render(w, h int) string {
 }
 
 func (b Box) FrameSize() (fw, fh int) {
-	return b.BoxStyle.Padding(0).BorderTop(false).GetFrameSize()
+	return b.BoxStyle.Padding(0).GetFrameSize()
 }
 
 func topBorder(align Alignment, width int, boxStyle, titleStyle lipgloss.Style, title string) string {
