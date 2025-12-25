@@ -114,6 +114,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.projectList.SetDelegate(projectItemDelegate{maxWidth: m.projectDelegateMaxW})
 		m.projectList.SetHeight(m.listsHeight)
 		m.taskList.SetHeight(m.listsHeight)
+	case changeFocusMsg:
+		m.currentFocus = msg.focus
+		return m, m.calculateDimensions(m.totalWidth, m.totalHeight)
 
 	case tea.KeyMsg:
 		switch {
@@ -139,18 +142,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, m.keys.focusProjects):
 			if !m.currentFocus.isEntry() {
-				m.currentFocus = focusProjects
+				return m, changeFocus(focusProjects)
 			}
 		case key.Matches(msg, m.keys.focusTasks):
 			if !m.currentFocus.isEntry() {
-				m.currentFocus = focusTasks
+				return m, changeFocus(focusTasks)
 			}
 		case key.Matches(msg, m.keys.newTask):
-			m.currentFocus = focusTaskEntry
-			return m, tea.Batch(m.taskEntryForm.Init(), m.calculateDimensions(m.totalWidth, m.totalHeight))
+			return m, tea.Batch(m.taskEntryForm.Init(), changeFocus(focusTaskEntry))
 		case key.Matches(msg, m.keys.newProject):
-			m.currentFocus = focusProjectEntry
-			return m, m.projectEntryForm.Init()
+			return m, tea.Batch(m.projectEntryForm.Init(), changeFocus(focusProjectEntry))
 		}
 	case refreshTasksMsg:
 		return m, m.getUpdatedTasks(m.currentProjectID, msg.selectTaskID)
@@ -214,16 +215,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, m.keys.cancelEntry):
-				m.currentFocus = focusTasks
-				return m, m.taskEntryForm.Reset()
+				return m, tea.Batch(m.taskEntryForm.Reset(), changeFocus(focusTasks))
 			}
 
 		case form.ResultMsg:
-			m.currentFocus = focusTasks
 			t := taskFromInputResult(msg.Result)
 			return m, tea.Batch(
 				m.insertTask(t, m.currentProjectID),
 				m.taskEntryForm.Reset(),
+				changeFocus(focusTasks),
 			)
 		}
 		return m, cmd
@@ -236,16 +236,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, m.keys.cancelEntry):
-				m.currentFocus = focusProjects
-				return m, m.projectEntryForm.Reset()
+				return m, tea.Batch(m.projectEntryForm.Reset(), changeFocus(focusProjects))
 			}
 
 		case form.ResultMsg:
-			m.currentFocus = focusProjects
 			p := projectFromInputResult(msg.Result)
 			return m, tea.Batch(
 				m.insertProject(p),
 				m.projectEntryForm.Reset(),
+				changeFocus(focusProjects),
 			)
 		}
 		return m, cmd
