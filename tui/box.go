@@ -7,7 +7,7 @@ import (
 
 func (m *model) createTopBox() *fbox.Box {
 	return fbox.New(fbox.Horizontal, 4).
-		AddTitleBox(m.createProjectsBox(), projViewName, 1, fbox.FixedSize(m.projectBoxWidth), nil, nil).
+		AddTitleBox(m.createProjectsBox(), projViewName, 1, fbox.FixedSize(m.projBoxW), nil, nil).
 		AddTitleBox(m.createTasksBox(), taskViewName, 8, nil, nil, nil)
 }
 

@@ -87,13 +87,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.calculateDimensions(msg.Width, msg.Height)
 	case dimensionsCalculatedMsg:
 		m.dimensions = msg.dimensions
-		m.projectList.SetDelegate(projectItemDelegate{maxWidth: m.projectDelegateMaxW})
-		m.projectList.SetHeight(m.listsHeight)
-		m.taskList.SetHeight(m.listsHeight)
+		m.projectList.SetDelegate(projectItemDelegate{maxWidth: m.projDelegMaxW})
+		m.projectList.SetHeight(m.listsH)
+		m.taskList.SetHeight(m.listsH)
 		m.logDimensions()
 	case changeFocusMsg:
 		m.currentFocus = msg.focus
-		return m, m.calculateDimensions(m.totalWidth, m.totalHeight)
+		return m, m.calculateDimensions(m.windowW, m.windowH)
 
 	case tea.KeyMsg:
 		switch {
@@ -104,7 +104,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.toggleHelp):
 			if !m.currentFocus.isEntry() {
 				m.showHelp = !m.showHelp
-				return m, m.calculateDimensions(m.totalWidth, m.totalHeight)
+				return m, m.calculateDimensions(m.windowW, m.windowH)
 			}
 		case key.Matches(msg, m.keys.delete):
 			switch m.currentFocus {
@@ -236,11 +236,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	if m.totalWidth == 0 || m.totalHeight == 0 {
+	if m.windowW == 0 || m.windowH == 0 {
 		return "Initializing..."
 	}
 
-	return m.createFlexbox().Render(m.totalWidth, m.totalHeight)
+	return m.createFlexbox().Render(m.windowW, m.windowH)
 }
 
 func (m *model) createFlexbox() *fbox.Box {

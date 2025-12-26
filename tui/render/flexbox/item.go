@@ -13,18 +13,6 @@ type Item struct {
 	Node        Node
 }
 
-// ItemLayout shows the width and height of an item in the flexbox, which will
-// sometimes be needed for calculations outside of the flexbox itself.
-type ItemLayout struct {
-	Name          string
-	ContentWidth  int
-	ContentHeight int
-	FrameWidth    int
-	FrameHeight   int
-	FullWidth     int
-	FullHeight    int
-}
-
 // Node represents a renderable component in the flexbox layout.
 //
 // FrameSize should return the border dimensions only (excluding padding).

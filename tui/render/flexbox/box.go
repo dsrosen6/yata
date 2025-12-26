@@ -1,17 +1,17 @@
 package flexbox
 
 import (
-	"fmt"
-	"strings"
+	"slices"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dsrosen6/yata/tui/render/titlebox"
 )
 
 type Box struct {
-	Direction Direction
-	Ratio     int
-	Items     []Item
+	Direction      Direction
+	Ratio          int
+	Items          []Item
+	LayoutsHandler *LayoutsHandler
 }
 
 type Direction int
@@ -23,9 +23,10 @@ const (
 
 func New(dir Direction, ratio int) *Box {
 	return &Box{
-		Direction: dir,
-		Ratio:     ratio,
-		Items:     []Item{},
+		Direction:      dir,
+		Ratio:          ratio,
+		Items:          []Item{}, // slice used for rendering items in correct order
+		LayoutsHandler: NewLayoutsHandler(),
 	}
 }
 
@@ -65,9 +66,24 @@ func (b *Box) RemoveItemAt(i int) *Box {
 }
 
 func (b *Box) FrameSize() (int, int) {
-	return 0, 0
+	if len(b.Items) == 0 {
+		return 0, 0
+	}
+
+	var widths, heights []int
+	for _, it := range b.Items {
+		fw, fh := it.Node.FrameSize()
+		widths = append(widths, fw)
+		heights = append(heights, fh)
+	}
+
+	if b.Direction == Vertical {
+		return slices.Max(widths), sum(heights)
+	}
+	return sum(widths), slices.Max(heights)
 }
 
+// GetAllItemsFrameSize gets the combined total frame widths and heights of a flexbox.
 func (b *Box) GetAllItemsFrameSize() (int, int) {
 	var w, h int
 	for _, it := range b.Items {
@@ -79,20 +95,30 @@ func (b *Box) GetAllItemsFrameSize() (int, int) {
 	return w, h
 }
 
-func (b *Box) CalculateItemLayouts(w, h int) []ItemLayout {
-	return b.calculateItemLayouts(w, h)
+// GetMaxItemFrameSize gets the maximum horizontal and vertical frame sizes from all items in a flexbox.
+func (b *Box) GetMaxItemFrameSize() (int, int) {
+	var widths, heights []int
+	for _, it := range b.Items {
+		fw, fh := it.Node.FrameSize()
+		widths = append(widths, fw)
+		heights = append(heights, fh)
+	}
+	w := slices.Max(widths)
+	h := slices.Max(heights)
+	return w, h
 }
 
+// Render calculates all of a box's current item layouts, and then returns the rendered string.
 func (b *Box) Render(w, h int) string {
 	if len(b.Items) == 0 {
 		return ""
 	}
 
-	layouts := b.calculateItemLayouts(w, h)
+	b.LayoutsHandler = b.calculateItemLayouts(w, h)
 
 	out := make([]string, 0, len(b.Items))
 	for i, it := range b.Items {
-		layout := layouts[i]
+		layout := b.LayoutsHandler.Layouts[i]
 		if layout.ContentWidth <= 0 || layout.ContentHeight <= 0 {
 			continue
 		}
@@ -106,9 +132,26 @@ func (b *Box) Render(w, h int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, out...)
 }
 
-func (b *Box) calculateItemLayouts(w, h int) []ItemLayout {
+// GetItemLayout is a shortcut method to calculate the box's layouts and then return
+// one specifically by name.
+func (b *Box) GetItemLayout(name string, w, h int) ItemLayout {
+	if b.LayoutsHandler == nil {
+		b.LayoutsHandler = b.CalculateItemLayouts(w, h)
+	}
+
+	return b.LayoutsHandler.GetLayout(name)
+}
+
+// CalculateItemLayouts calculates all of a box's current item layouts and then returns
+// the layout handler.
+func (b *Box) CalculateItemLayouts(w, h int) *LayoutsHandler {
+	return b.calculateItemLayouts(w, h)
+}
+
+func (b *Box) calculateItemLayouts(w, h int) *LayoutsHandler {
+	lh := NewLayoutsHandler()
 	if len(b.Items) == 0 {
-		return nil
+		return lh
 	}
 
 	// Determine main and cross sizes
@@ -159,7 +202,6 @@ func (b *Box) calculateItemLayouts(w, h int) []ItemLayout {
 	}
 
 	// second pass: render items
-	layouts := make([]ItemLayout, 0, len(b.Items))
 	usedFlexible := 0
 	for i, it := range b.Items {
 		fw, fh := it.Node.FrameSize()
@@ -184,7 +226,7 @@ func (b *Box) calculateItemLayouts(w, h int) []ItemLayout {
 		}
 
 		if itemCross <= 0 {
-			layouts = append(layouts, ItemLayout{Name: it.Name})
+			lh.AddLayout(ItemLayout{Name: it.Name})
 			continue
 		}
 
@@ -224,6 +266,7 @@ func (b *Box) calculateItemLayouts(w, h int) []ItemLayout {
 			cw = itemCross
 			ch = itemMain
 		}
+
 		l := ItemLayout{
 			Name:          it.Name,
 			ContentWidth:  cw,
@@ -233,10 +276,11 @@ func (b *Box) calculateItemLayouts(w, h int) []ItemLayout {
 			FullWidth:     cw + fw,
 			FullHeight:    ch + fh,
 		}
-		layouts = append(layouts, l)
+
+		lh.AddLayout(l)
 	}
 
-	return layouts
+	return lh
 }
 
 // FixedSize is a helper function for passing fixed sizes to constructor funcs so
@@ -245,17 +289,11 @@ func FixedSize(s int) *int {
 	return &s
 }
 
-func LayoutsToMap(layouts []ItemLayout) map[string]ItemLayout {
-	unknownCounter := 1
-	lm := make(map[string]ItemLayout, len(layouts))
-	for _, l := range layouts {
-		name := l.Name
-		if strings.TrimSpace(name) == "" {
-			name = fmt.Sprintf("unknown%d", unknownCounter)
-			unknownCounter++
-		}
-		lm[name] = l
+func sum(s []int) int {
+	total := 0
+	for _, i := range s {
+		total += i
 	}
 
-	return lm
+	return total
 }

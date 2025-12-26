@@ -114,7 +114,7 @@ func (m *model) toggleTaskComplete(t taskItem) tea.Cmd {
 			return storeErrorMsg{err}
 		}
 
-		return refreshTasksMsg{selectTaskID: 0}
+		return refreshTasksMsg{selectTaskID: t.ID}
 	}
 }
 

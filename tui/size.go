@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -9,64 +10,45 @@ import (
 )
 
 type dimensions struct {
-	totalWidth          int
-	totalHeight         int
-	projectBoxWidth     int
-	projectDelegateMaxW int
-	listsHeight         int
+	windowW       int
+	windowH       int
+	projBoxW      int
+	projDelegMaxW int
+	listsH        int
 
 	// all of the below are for debug purposes
-	renderedWidth   int
-	renderedHeight  int
-	topBoxWidth     int
-	topBoxHeight    int
-	taskEntryWidth  int
-	taskEntryHeight int
-	projEntryWidth  int
-	projEntryHeight int
-	helpWidth       int
-	helpHeight      int
+	renderedW       int
+	renderedH       int
+	topBoxMaxFrameW int
+	topBoxMaxFrameH int
+	topBoxLayout    fbox.ItemLayout
+	taskEntryLayout fbox.ItemLayout
+	projEntryLayout fbox.ItemLayout
+	helpLayout      fbox.ItemLayout
 }
 
 func (m *model) calculateDimensions(w, h int) tea.Cmd {
 	return func() tea.Msg {
 		d := &dimensions{}
-		d.totalWidth = w
-		d.totalHeight = h
+		d.windowW = w
+		d.windowH = h
 
 		box := m.createFlexbox()
-		layouts := box.CalculateItemLayouts(w, h)
-		lm := fbox.LayoutsToMap(layouts)
-
-		if l, ok := lm[topBoxName]; ok {
-			d.topBoxWidth = l.FullWidth
-			d.topBoxHeight = l.FullHeight
-		}
-
-		if l, ok := lm[taskEntryName]; ok {
-			d.taskEntryWidth = l.FullWidth
-			d.taskEntryHeight = l.FullHeight
-		}
-
-		if l, ok := lm[projEntryName]; ok {
-			d.projEntryWidth = l.FullWidth
-			d.projEntryHeight = l.FullHeight
-		}
-
-		if l, ok := lm[helpViewName]; ok {
-			d.helpWidth = l.FullWidth
-			d.helpHeight = l.FullHeight
-		}
-
 		rendered := box.Render(w, h)
-		d.renderedWidth = lipgloss.Width(rendered)
-		d.renderedHeight = lipgloss.Height(rendered)
+
+		d.topBoxLayout = box.LayoutsHandler.GetLayout(topBoxName)
+		d.taskEntryLayout = box.LayoutsHandler.GetLayout(taskEntryName)
+		d.projEntryLayout = box.LayoutsHandler.GetLayout(projEntryName)
+		d.helpLayout = box.LayoutsHandler.GetLayout(helpViewName)
+
+		d.renderedW = lipgloss.Width(rendered)
+		d.renderedH = lipgloss.Height(rendered)
 
 		tb := m.createTopBox()
-		fw, fh := tb.GetAllItemsFrameSize()
-		d.projectBoxWidth = 15
-		d.projectDelegateMaxW = d.projectBoxWidth - fw
-		d.listsHeight = d.topBoxHeight - fh
+		d.topBoxMaxFrameW, d.topBoxMaxFrameH = tb.GetMaxItemFrameSize()
+		d.projBoxW = 15
+		d.projDelegMaxW = d.projBoxW - d.topBoxMaxFrameW
+		d.listsH = d.topBoxLayout.ContentHeight - d.topBoxMaxFrameH
 		return dimensionsCalculatedMsg{*d}
 	}
 }
@@ -76,15 +58,25 @@ func (m *model) logDimensions() {
 	slog.Debug(
 		"dimensions calculated",
 		"focus", m.currentFocus.toString(),
-		"total_w", d.totalWidth,
-		"total_h", d.totalHeight,
-		slog.Group("rendered", "width", d.renderedWidth, "height", d.renderedHeight),
-		slog.Group("top_box", "width", d.topBoxWidth, "height", d.topBoxHeight),
-		slog.Group("task_entry", "width", d.taskEntryWidth, "height", d.taskEntryHeight),
-		slog.Group("project_entry", "width", d.projectBoxWidth, "height", d.projEntryHeight),
-		slog.Group("help", "width", d.helpWidth, "height", d.helpHeight),
-		"proj_box_w", d.projectBoxWidth,
-		"proj_del_max_w", d.projectDelegateMaxW,
-		"lists_h", d.listsHeight,
+		"window_width", d.windowW,
+		"window_height", d.windowH,
+		"proj_box_width", d.projBoxW,
+		"proj_del_max_width", d.projDelegMaxW,
+		"top_box_max_frame", fmt.Sprintf("%dx%d", d.topBoxMaxFrameW, d.topBoxMaxFrameH),
+		"lists_height", d.listsH,
+		slog.Group("rendered", "width", d.renderedW, "height", d.renderedH),
+		layoutLogGrp(d.topBoxLayout),
+		layoutLogGrp(d.taskEntryLayout),
+		layoutLogGrp(d.projEntryLayout),
+		layoutLogGrp(d.helpLayout),
+	)
+}
+
+func layoutLogGrp(l fbox.ItemLayout) slog.Attr {
+	return slog.Group(
+		l.Name,
+		"full", fmt.Sprintf("%dx%d", l.FullWidth, l.FullHeight),
+		"content", fmt.Sprintf("%dx%d", l.ContentWidth, l.ContentHeight),
+		"full_frame", fmt.Sprintf("%dx%d", l.FrameWidth, l.FrameHeight),
 	)
 }
