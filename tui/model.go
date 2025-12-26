@@ -8,10 +8,18 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/dsrosen6/yata/models"
 	"github.com/dsrosen6/yata/tui/models/form"
 	fbox "github.com/dsrosen6/yata/tui/render/flexbox"
+)
+
+const (
+	topBoxName    = "topBox"
+	taskViewName  = "taskView"
+	taskEntryName = "taskEntry"
+	projViewName  = "projectView"
+	projEntryName = "projectEntry"
+	helpViewName  = "helpView"
 )
 
 type (
@@ -33,14 +41,6 @@ type (
 
 	dimensionsCalculatedMsg struct{ dimensions }
 )
-
-type dimensions struct {
-	totalWidth          int
-	totalHeight         int
-	projectBoxWidth     int
-	projectDelegateMaxW int
-	listsHeight         int
-}
 
 func initialModel(stores *models.AllRepos) (*model, error) {
 	te, err := newTaskEntryForm()
@@ -80,30 +80,6 @@ func (m *model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *model) calculateDimensions(w, h int) tea.Cmd {
-	return func() tea.Msg {
-		d := &dimensions{}
-		d.totalWidth = w
-		d.totalHeight = h
-		tb := m.createTopBox()
-		fw, fh := tb.GetAllItemsFrameSize()
-
-		_, tbh := lipgloss.Size(tb.Render(d.totalWidth, d.totalHeight))
-
-		listH := tbh - fh
-		if m.showHelp {
-			hh := lipgloss.Height(m.help.ShortHelpView(m.helpKeys()))
-			listH = listH - hh
-		}
-
-		d.projectBoxWidth = 15
-		d.projectDelegateMaxW = d.projectBoxWidth - fw
-
-		d.listsHeight = listH
-		return dimensionsCalculatedMsg{*d}
-	}
-}
-
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
@@ -114,6 +90,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.projectList.SetDelegate(projectItemDelegate{maxWidth: m.projectDelegateMaxW})
 		m.projectList.SetHeight(m.listsHeight)
 		m.taskList.SetHeight(m.listsHeight)
+		m.logDimensions()
 	case changeFocusMsg:
 		m.currentFocus = msg.focus
 		return m, m.calculateDimensions(m.totalWidth, m.totalHeight)
@@ -127,6 +104,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.toggleHelp):
 			if !m.currentFocus.isEntry() {
 				m.showHelp = !m.showHelp
+				return m, m.calculateDimensions(m.totalWidth, m.totalHeight)
 			}
 		case key.Matches(msg, m.keys.delete):
 			switch m.currentFocus {
@@ -149,9 +127,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, changeFocus(focusTasks)
 			}
 		case key.Matches(msg, m.keys.newTask):
-			return m, tea.Batch(m.taskEntryForm.Init(), changeFocus(focusTaskEntry))
+			if !m.currentFocus.isEntry() {
+				return m, tea.Batch(m.taskEntryForm.Init(), changeFocus(focusTaskEntry))
+			}
 		case key.Matches(msg, m.keys.newProject):
-			return m, tea.Batch(m.projectEntryForm.Init(), changeFocus(focusProjectEntry))
+			if !m.currentFocus.isEntry() {
+				return m, tea.Batch(m.projectEntryForm.Init(), changeFocus(focusProjectEntry))
+			}
 		}
 	case refreshTasksMsg:
 		return m, m.getUpdatedTasks(m.currentProjectID, msg.selectTaskID)
@@ -258,12 +240,14 @@ func (m *model) View() string {
 		return "Initializing..."
 	}
 
-	hv := m.help.ShortHelpView(m.helpKeys())
-	fl := fbox.New(fbox.Vertical, 1).
-		AddFlexBox(m.createTopBox(), 7, nil, nil, nil).
-		AddTitleBox(m.createTaskEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusTaskEntry }).
-		AddTitleBox(m.createProjectEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusProjectEntry }).
-		AddStyleBox(helpStyle, hv, 1, nil, fbox.FixedSize(1), func() bool { return m.showHelp })
+	return m.createFlexbox().Render(m.totalWidth, m.totalHeight)
+}
 
-	return fl.Render(m.totalWidth, m.totalHeight)
+func (m *model) createFlexbox() *fbox.Box {
+	hv := m.help.ShortHelpView(m.helpKeys())
+	return fbox.New(fbox.Vertical, 1).
+		AddFlexBox(m.createTopBox(), topBoxName, 7, nil, nil, nil).
+		AddTitleBox(m.createTaskEntryBox(), taskEntryName, 1, nil, nil, func() bool { return m.currentFocus == focusTaskEntry }).
+		AddTitleBox(m.createProjectEntryBox(), projEntryName, 1, nil, nil, func() bool { return m.currentFocus == focusProjectEntry }).
+		AddStyleBox(helpStyle, helpViewName, hv, 1, nil, fbox.FixedSize(1), func() bool { return m.showHelp })
 }

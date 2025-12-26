@@ -1,6 +1,9 @@
 package flexbox
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dsrosen6/yata/tui/render/titlebox"
 )
@@ -26,18 +29,18 @@ func New(dir Direction, ratio int) *Box {
 	}
 }
 
-func (b *Box) AddTitleBox(box titlebox.Box, ratio int, fixedW, fixedH *int, showFunc func() bool) *Box {
-	it := TitleBoxToItem(box, ratio, fixedW, fixedH)
+func (b *Box) AddTitleBox(box titlebox.Box, name string, ratio int, fixedW, fixedH *int, showFunc func() bool) *Box {
+	it := TitleBoxToItem(box, name, ratio, fixedW, fixedH)
 	return b.AddItem(it, showFunc)
 }
 
-func (b *Box) AddStyleBox(s lipgloss.Style, body string, ratio int, fixedW, fixedH *int, showFunc func() bool) *Box {
-	it := StyleToItem(s, body, ratio, fixedW, fixedH)
+func (b *Box) AddStyleBox(s lipgloss.Style, name, body string, ratio int, fixedW, fixedH *int, showFunc func() bool) *Box {
+	it := StyleToItem(s, name, body, ratio, fixedW, fixedH)
 	return b.AddItem(it, showFunc)
 }
 
-func (b *Box) AddFlexBox(box *Box, ratio int, fixedW, fixedH *int, showFunc func() bool) *Box {
-	it := FlexBoxToItem(box, ratio, fixedW, fixedH)
+func (b *Box) AddFlexBox(box *Box, name string, ratio int, fixedW, fixedH *int, showFunc func() bool) *Box {
+	it := FlexBoxToItem(box, name, ratio, fixedW, fixedH)
 	return b.AddItem(it, showFunc)
 }
 
@@ -76,9 +79,36 @@ func (b *Box) GetAllItemsFrameSize() (int, int) {
 	return w, h
 }
 
+func (b *Box) CalculateItemLayouts(w, h int) []ItemLayout {
+	return b.calculateItemLayouts(w, h)
+}
+
 func (b *Box) Render(w, h int) string {
 	if len(b.Items) == 0 {
 		return ""
+	}
+
+	layouts := b.calculateItemLayouts(w, h)
+
+	out := make([]string, 0, len(b.Items))
+	for i, it := range b.Items {
+		layout := layouts[i]
+		if layout.ContentWidth <= 0 || layout.ContentHeight <= 0 {
+			continue
+		}
+
+		out = append(out, it.Node.Render(layout.ContentWidth, layout.ContentHeight))
+	}
+
+	if b.Direction == Vertical {
+		return lipgloss.JoinVertical(lipgloss.Top, out...)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, out...)
+}
+
+func (b *Box) calculateItemLayouts(w, h int) []ItemLayout {
+	if len(b.Items) == 0 {
+		return nil
 	}
 
 	// Determine main and cross sizes
@@ -129,7 +159,7 @@ func (b *Box) Render(w, h int) string {
 	}
 
 	// second pass: render items
-	out := make([]string, 0, len(b.Items))
+	layouts := make([]ItemLayout, 0, len(b.Items))
 	usedFlexible := 0
 	for i, it := range b.Items {
 		fw, fh := it.Node.FrameSize()
@@ -154,6 +184,7 @@ func (b *Box) Render(w, h int) string {
 		}
 
 		if itemCross <= 0 {
+			layouts = append(layouts, ItemLayout{Name: it.Name})
 			continue
 		}
 
@@ -187,21 +218,44 @@ func (b *Box) Render(w, h int) string {
 			itemMain = 0
 		}
 
+		cw := itemMain
+		ch := itemCross
 		if b.Direction == Vertical {
-			out = append(out, it.Node.Render(itemCross, itemMain))
-		} else {
-			out = append(out, it.Node.Render(itemMain, itemCross))
+			cw = itemCross
+			ch = itemMain
 		}
+		l := ItemLayout{
+			Name:          it.Name,
+			ContentWidth:  cw,
+			ContentHeight: ch,
+			FrameWidth:    fw,
+			FrameHeight:   fh,
+			FullWidth:     cw + fw,
+			FullHeight:    ch + fh,
+		}
+		layouts = append(layouts, l)
 	}
 
-	if b.Direction == Vertical {
-		return lipgloss.JoinVertical(lipgloss.Top, out...)
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, out...)
+	return layouts
 }
 
 // FixedSize is a helper function for passing fixed sizes to constructor funcs so
 // an extra line defining the int isn't necessary.
 func FixedSize(s int) *int {
 	return &s
+}
+
+func LayoutsToMap(layouts []ItemLayout) map[string]ItemLayout {
+	unknownCounter := 1
+	lm := make(map[string]ItemLayout, len(layouts))
+	for _, l := range layouts {
+		name := l.Name
+		if strings.TrimSpace(name) == "" {
+			name = fmt.Sprintf("unknown%d", unknownCounter)
+			unknownCounter++
+		}
+		lm[name] = l
+	}
+
+	return lm
 }
