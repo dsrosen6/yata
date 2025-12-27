@@ -1,6 +1,15 @@
 package tui
 
-import "github.com/dsrosen6/yata/tui/render/titlebox"
+import (
+	fbox "github.com/dsrosen6/yata/tui/render/flexbox"
+	"github.com/dsrosen6/yata/tui/render/titlebox"
+)
+
+func (m *model) createTopBox() *fbox.Box {
+	return fbox.New(fbox.Horizontal, 4).
+		AddTitleBox(m.createProjectsBox(), projViewName, 1, fbox.FixedSize(m.projBoxW), nil, nil).
+		AddTitleBox(m.createTasksBox(), taskViewName, 8, nil, nil, nil)
+}
 
 func (m *model) createProjectsBox() titlebox.Box {
 	boxStyle := allStyles.unfocusedBoxStyle

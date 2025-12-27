@@ -13,6 +13,15 @@ import (
 	fbox "github.com/dsrosen6/yata/tui/render/flexbox"
 )
 
+const (
+	topBoxName    = "topBox"
+	taskViewName  = "taskView"
+	taskEntryName = "taskEntry"
+	projViewName  = "projectView"
+	projEntryName = "projectEntry"
+	helpViewName  = "helpView"
+)
+
 type (
 	model struct {
 		stores           *models.AllRepos
@@ -29,14 +38,9 @@ type (
 
 		dimensions
 	}
-)
 
-type dimensions struct {
-	totalWidth          int
-	totalHeight         int
-	projectBoxWidth     int
-	projectDelegateMaxW int
-}
+	dimensionsCalculatedMsg struct{ dimensions }
+)
 
 func initialModel(stores *models.AllRepos) (*model, error) {
 	te, err := newTaskEntryForm()
@@ -76,23 +80,20 @@ func (m *model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *model) calculateDimensions(msg tea.WindowSizeMsg) dimensions {
-	d := &dimensions{}
-	d.totalWidth = msg.Width
-	d.totalHeight = msg.Height
-	f, _ := m.createProjectsBox().FrameSize()
-
-	d.projectBoxWidth = 15
-	d.projectDelegateMaxW = d.projectBoxWidth - f
-	return *d
-}
-
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.dimensions = m.calculateDimensions(msg)
-		m.projectList.SetDelegate(projectItemDelegate{maxWidth: m.projectDelegateMaxW})
+		return m, m.calculateDimensions(msg.Width, msg.Height)
+	case dimensionsCalculatedMsg:
+		m.dimensions = msg.dimensions
+		m.projectList.SetDelegate(projectItemDelegate{maxWidth: m.projDelegMaxW})
+		m.projectList.SetHeight(m.listsH)
+		m.taskList.SetHeight(m.listsH)
+		m.logDimensions()
+	case changeFocusMsg:
+		m.currentFocus = msg.focus
+		return m, m.calculateDimensions(m.windowW, m.windowH)
 
 	case tea.KeyMsg:
 		switch {
@@ -103,6 +104,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.toggleHelp):
 			if !m.currentFocus.isEntry() {
 				m.showHelp = !m.showHelp
+				return m, m.calculateDimensions(m.windowW, m.windowH)
 			}
 		case key.Matches(msg, m.keys.delete):
 			switch m.currentFocus {
@@ -117,27 +119,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, m.keys.focusProjects):
-			if m.currentFocus == focusTasks {
-				m.currentFocus = focusProjects
-			}
-		case key.Matches(msg, m.keys.focusTasks):
-			if m.currentFocus == focusProjects {
-				m.currentFocus = focusTasks
-			}
-		case key.Matches(msg, m.keys.focusProjects):
 			if !m.currentFocus.isEntry() {
-				m.currentFocus = focusProjects
+				return m, changeFocus(focusProjects)
 			}
 		case key.Matches(msg, m.keys.focusTasks):
 			if !m.currentFocus.isEntry() {
-				m.currentFocus = focusTasks
+				return m, changeFocus(focusTasks)
 			}
 		case key.Matches(msg, m.keys.newTask):
-			m.currentFocus = focusTaskEntry
-			return m, m.taskEntryForm.Init()
+			if !m.currentFocus.isEntry() {
+				return m, tea.Batch(m.taskEntryForm.Init(), changeFocus(focusTaskEntry))
+			}
 		case key.Matches(msg, m.keys.newProject):
-			m.currentFocus = focusProjectEntry
-			return m, m.projectEntryForm.Init()
+			if !m.currentFocus.isEntry() {
+				return m, tea.Batch(m.projectEntryForm.Init(), changeFocus(focusProjectEntry))
+			}
 		}
 	case refreshTasksMsg:
 		return m, m.getUpdatedTasks(m.currentProjectID, msg.selectTaskID)
@@ -147,6 +143,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskList.SetItems(msg.tasks),
 			m.adjustTaskListIndex(),
 			m.selectTask(msg.selectTaskID),
+			m.calculateDimensions(m.windowW, m.windowH),
 		}
 
 		return m, tea.Batch(cmds...)
@@ -201,16 +198,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, m.keys.cancelEntry):
-				m.currentFocus = focusTasks
-				return m, m.taskEntryForm.Reset()
+				return m, tea.Batch(m.taskEntryForm.Reset(), changeFocus(focusTasks))
 			}
 
 		case form.ResultMsg:
-			m.currentFocus = focusTasks
 			t := taskFromInputResult(msg.Result)
 			return m, tea.Batch(
 				m.insertTask(t, m.currentProjectID),
 				m.taskEntryForm.Reset(),
+				changeFocus(focusTasks),
 			)
 		}
 		return m, cmd
@@ -223,16 +219,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, m.keys.cancelEntry):
-				m.currentFocus = focusProjects
-				return m, m.projectEntryForm.Reset()
+				return m, tea.Batch(m.projectEntryForm.Reset(), changeFocus(focusProjects))
 			}
 
 		case form.ResultMsg:
-			m.currentFocus = focusProjects
 			p := projectFromInputResult(msg.Result)
 			return m, tea.Batch(
 				m.insertProject(p),
 				m.projectEntryForm.Reset(),
+				changeFocus(focusProjects),
 			)
 		}
 		return m, cmd
@@ -242,20 +237,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	if m.totalWidth == 0 || m.totalHeight == 0 {
+	if m.windowW == 0 || m.windowH == 0 {
 		return "Initializing..."
 	}
 
-	topBox := fbox.New(fbox.Horizontal, 4).
-		AddTitleBox(m.createProjectsBox(), 1, fbox.FixedSize(m.projectBoxWidth), nil, nil).
-		AddTitleBox(m.createTasksBox(), 8, nil, nil, nil)
+	return m.createFlexbox().Render(m.windowW, m.windowH)
+}
 
+func (m *model) createFlexbox() *fbox.Box {
 	hv := m.help.ShortHelpView(m.helpKeys())
-	fl := fbox.New(fbox.Vertical, 1).
-		AddFlexBox(topBox, 7, nil, nil, nil).
-		AddTitleBox(m.createTaskEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusTaskEntry }).
-		AddTitleBox(m.createProjectEntryBox(), 1, nil, nil, func() bool { return m.currentFocus == focusProjectEntry }).
-		AddStyleBox(helpStyle, hv, 1, nil, fbox.FixedSize(1), func() bool { return m.showHelp })
-
-	return fl.Render(m.totalWidth, m.totalHeight)
+	return fbox.New(fbox.Vertical, 1).
+		AddFlexBox(m.createTopBox(), topBoxName, 7, nil, nil, nil).
+		AddTitleBox(m.createTaskEntryBox(), taskEntryName, 1, nil, nil, func() bool { return m.currentFocus == focusTaskEntry }).
+		AddTitleBox(m.createProjectEntryBox(), projEntryName, 1, nil, nil, func() bool { return m.currentFocus == focusProjectEntry }).
+		AddStyleBox(helpStyle, helpViewName, hv, 1, nil, fbox.FixedSize(1), func() bool { return m.showHelp })
 }

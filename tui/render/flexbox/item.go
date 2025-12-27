@@ -6,6 +6,7 @@ import (
 )
 
 type Item struct {
+	Name        string
 	Ratio       int
 	FixedWidth  *int
 	FixedHeight *int
@@ -31,8 +32,9 @@ type StyleNode struct {
 	Body  string
 }
 
-func TitleBoxToItem(box titlebox.Box, ratio int, fixedW, fixedH *int) Item {
+func TitleBoxToItem(box titlebox.Box, name string, ratio int, fixedW, fixedH *int) Item {
 	return Item{
+		Name:        name,
 		Ratio:       ratio,
 		FixedWidth:  fixedW,
 		FixedHeight: fixedH,
@@ -40,8 +42,9 @@ func TitleBoxToItem(box titlebox.Box, ratio int, fixedW, fixedH *int) Item {
 	}
 }
 
-func StyleToItem(style lipgloss.Style, body string, ratio int, fixedW, fixedH *int) Item {
+func StyleToItem(style lipgloss.Style, name, body string, ratio int, fixedW, fixedH *int) Item {
 	return Item{
+		Name:        name,
 		Ratio:       ratio,
 		FixedWidth:  fixedW,
 		FixedHeight: fixedH,
@@ -49,8 +52,9 @@ func StyleToItem(style lipgloss.Style, body string, ratio int, fixedW, fixedH *i
 	}
 }
 
-func FlexBoxToItem(box *Box, ratio int, fixedW, fixedH *int) Item {
+func FlexBoxToItem(box *Box, name string, ratio int, fixedW, fixedH *int) Item {
 	return Item{
+		Name:        name,
 		Ratio:       ratio,
 		FixedWidth:  fixedW,
 		FixedHeight: fixedH,
