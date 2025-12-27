@@ -12,7 +12,7 @@ import (
 
 type (
 	refreshTasksMsg struct {
-		projectID    int64
+		projectID    *int64
 		selectTaskID int64
 	}
 	gotUpdatedTasksMsg struct {
@@ -51,7 +51,7 @@ func (m *model) adjustTaskListIndex() tea.Cmd {
 // getUpdatedTasks retrieves tasks from the store and returns a gotUpdatedTasksMsg with those tasks,
 // which will later be used to update the visible list. It takes a project ID to filter by project,
 // and a task ID to be later used to select the proper task once refreshed.
-func (m *model) getUpdatedTasks(projectID, selectTaskID int64) tea.Cmd {
+func (m *model) getUpdatedTasks(projectID *int64, selectTaskID int64) tea.Cmd {
 	return func() tea.Msg {
 		var (
 			tasks []*models.Task
@@ -61,10 +61,10 @@ func (m *model) getUpdatedTasks(projectID, selectTaskID int64) tea.Cmd {
 		ctx := context.Background()
 
 		// if no project ID is provided, assume the "all" view in the projects list is selected
-		if m.currentProjectID == 0 {
+		if projectID == nil {
 			tasks, err = m.stores.Tasks.ListAll(ctx)
 		} else {
-			tasks, err = m.stores.Tasks.ListByProjectID(ctx, projectID)
+			tasks, err = m.stores.Tasks.ListByProjectID(ctx, *projectID)
 		}
 
 		if err != nil {
@@ -79,10 +79,10 @@ func (m *model) getUpdatedTasks(projectID, selectTaskID int64) tea.Cmd {
 	}
 }
 
-func (m *model) insertTask(t taskItem, projectID int64) tea.Cmd {
+func (m *model) insertTask(t taskItem, projectID *int64) tea.Cmd {
 	return func() tea.Msg {
-		if projectID != 0 {
-			t.ProjectID = &projectID
+		if projectID != nil {
+			t.ProjectID = projectID
 		}
 
 		created, err := m.stores.Tasks.Create(context.Background(), t.Task)

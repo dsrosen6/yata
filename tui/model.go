@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -23,19 +24,24 @@ const (
 
 type (
 	model struct {
-		appState         *models.AppState
-		stores           *models.AllRepos
-		keys             keyMap
-		help             help.Model
-		showHelp         bool
-		taskList         list.Model
-		projectList      list.Model
-		sortParams       *models.SortParams
-		currentFocus     focus
-		currentProjectID int64
+		state        *models.AppState
+		stores       *models.AllRepos
+		keys         keyMap
+		help         help.Model
+		taskList     list.Model
+		projectList  list.Model
+		sortParams   *models.SortParams
+		currentFocus focus
 
+		initFlags
 		forms
 		dimensions
+	}
+
+	initFlags struct {
+		// gotSize guards project/task refreshes from occuring until
+		// the initial WindowSizeMsg is received
+		gotSize bool
 	}
 
 	forms struct {
@@ -65,13 +71,13 @@ func initialModel(stores *models.AllRepos) (*model, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting initial app state: %w", err)
 	}
+	slog.Debug("got initial app state", logAppState(s))
 
 	return &model{
-		appState:    s,
+		state:       s,
 		stores:      stores,
 		keys:        defaultKeyMap,
 		help:        help.New(),
-		showHelp:    true,
 		taskList:    initialTaskList(),
 		projectList: initialProjectList(),
 		sortParams:  &models.SortParams{SortBy: models.SortByComplete},
@@ -80,12 +86,7 @@ func initialModel(stores *models.AllRepos) (*model, error) {
 }
 
 func (m *model) Init() tea.Cmd {
-	var sel int64
-	if m.appState.SelectedProjectID != nil {
-		sel = *m.appState.SelectedProjectID
-	}
-
-	return m.refreshProjects(sel)
+	return nil
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -99,6 +100,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.projectList.SetHeight(m.listsH)
 		m.taskList.SetHeight(m.listsH)
 		m.logDimensions()
+		if !m.gotSize {
+			m.gotSize = true
+			return m, m.refreshProjects(m.state.SelectedProjectID)
+		}
+
 	case changeFocusMsg:
 		m.currentFocus = msg.focus
 		return m, m.calculateDimensions(m.windowW, m.windowH)
@@ -111,7 +117,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, m.keys.toggleHelp):
 			if !m.currentFocus.isEntry() {
-				m.showHelp = !m.showHelp
+				m.state.ShowHelp = !m.state.ShowHelp
 				return m, m.calculateDimensions(m.windowW, m.windowH)
 			}
 		case key.Matches(msg, m.keys.delete):
@@ -122,8 +128,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case focusProjects:
 				// Don't allow deleting the "all" entry (which has ID 0)
-				if len(m.projectList.Items()) > 0 && m.selectedProjectID() != 0 {
-					return m, m.deleteProject(m.selectedProjectID())
+				if len(m.projectList.Items()) > 0 && m.selectedProjectID() != nil {
+					return m, m.deleteProject(*m.selectedProjectID())
 				}
 			}
 		case key.Matches(msg, m.keys.focusProjects):
@@ -144,7 +150,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case refreshTasksMsg:
-		return m, m.getUpdatedTasks(m.currentProjectID, msg.selectTaskID)
+		return m, m.getUpdatedTasks(m.state.SelectedProjectID, msg.selectTaskID)
 
 	case gotUpdatedTasksMsg:
 		cmds := []tea.Cmd{
@@ -170,15 +176,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.adjustProjectListIndex(),
 		}
 
-		if msg.selectProjectID != 0 {
+		if msg.selectProjectID != nil {
 			cmds = append(cmds, m.selectProject(msg.selectProjectID))
 		}
 
 		return m, tea.Batch(cmds...)
 
 	case selectedProjectChangedMsg:
-		m.currentProjectID = msg.selected
-		return m, m.getUpdatedTasks(m.currentProjectID, 0)
+		m.state.SelectedProjectID = msg.selected
+		return m, m.getUpdatedTasks(m.state.SelectedProjectID, 0)
 	}
 
 	switch m.currentFocus {
@@ -216,7 +222,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case form.ResultMsg:
 			t := taskFromInputResult(msg.Result)
 			return m, tea.Batch(
-				m.insertTask(t, m.currentProjectID),
+				m.insertTask(t, m.state.SelectedProjectID),
 				m.taskEntryForm.Reset(),
 				changeFocus(focusTasks),
 			)
@@ -249,7 +255,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	if m.windowW == 0 || m.windowH == 0 {
+	if !m.gotSize {
 		return "Initializing..."
 	}
 
@@ -262,5 +268,5 @@ func (m *model) createFlexbox() *fbox.Box {
 		AddFlexBox(m.createTopBox(), topBoxName, 7, nil, nil, nil).
 		AddTitleBox(m.createTaskEntryBox(), taskEntryName, 1, nil, nil, func() bool { return m.currentFocus == focusTaskEntry }).
 		AddTitleBox(m.createProjectEntryBox(), projEntryName, 1, nil, nil, func() bool { return m.currentFocus == focusProjectEntry }).
-		AddStyleBox(helpStyle, helpViewName, hv, 1, nil, fbox.FixedSize(1), func() bool { return m.showHelp })
+		AddStyleBox(helpStyle, helpViewName, hv, 1, nil, fbox.FixedSize(1), func() bool { return m.state.ShowHelp })
 }

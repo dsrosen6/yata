@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -14,28 +13,27 @@ import (
 )
 
 type (
-	selectedProjectChangedMsg struct{ selected int64 }
-	refreshProjectsMsg        struct{ selectProjectID int64 }
+	selectedProjectChangedMsg struct{ selected *int64 }
+	refreshProjectsMsg        struct{ selectProjectID *int64 }
 	gotUpdatedProjectsMsg     struct {
 		projects        []list.Item
-		selectProjectID int64
+		selectProjectID *int64
 	}
 )
 
 func (m *model) checkProjectChanged() tea.Cmd {
 	return func() tea.Msg {
 		sel := m.selectedProjectID()
-		if m.currentProjectID != sel {
-			slog.Debug("selected project ID changed", "prev", m.currentProjectID, "new", sel)
+		if m.state.SelectedProjectID != sel {
 			return selectedProjectChangedMsg{selected: sel}
 		}
 		return nil
 	}
 }
 
-func (m *model) selectProject(id int64) tea.Cmd {
+func (m *model) selectProject(id *int64) tea.Cmd {
 	for i, item := range m.projectList.Items() {
-		if p, ok := item.(taskProjectItem); ok && p.ID == id {
+		if p, ok := item.(taskProjectItem); ok && p.ID == *id {
 			m.projectList.Select(i)
 			break
 		}
@@ -51,7 +49,7 @@ func (m *model) adjustProjectListIndex() tea.Cmd {
 	return nil
 }
 
-func (m *model) refreshProjects(selectProjectID int64) tea.Cmd {
+func (m *model) refreshProjects(selectProjectID *int64) tea.Cmd {
 	return func() tea.Msg {
 		projects, err := m.stores.Projects.ListAll(context.Background())
 		if err != nil {
@@ -72,7 +70,7 @@ func (m *model) insertProject(p taskProjectItem) tea.Cmd {
 			return storeErrorMsg{err}
 		}
 
-		return refreshProjectsMsg{selectProjectID: created.ID}
+		return refreshProjectsMsg{selectProjectID: &created.ID}
 	}
 }
 
@@ -82,17 +80,17 @@ func (m *model) deleteProject(id int64) tea.Cmd {
 			return storeErrorMsg{err}
 		}
 
-		return refreshProjectsMsg{selectProjectID: 0}
+		return refreshProjectsMsg{selectProjectID: nil}
 	}
 }
 
-func (m *model) selectedProjectID() int64 {
+func (m *model) selectedProjectID() *int64 {
 	sel := m.selectedProject()
 	if sel == nil {
-		return 0
+		return nil
 	}
 
-	return sel.ID
+	return &sel.ID
 }
 
 func (m *model) selectedProject() *taskProjectItem {
@@ -101,7 +99,9 @@ func (m *model) selectedProject() *taskProjectItem {
 		return nil
 	}
 	sel := item.(taskProjectItem)
-	if sel.Project == nil {
+	// having the static "all" project selected shows an id of 0,
+	// so treat it as nil to avoid foreign key violations
+	if sel.Project == nil || sel.ID == 0 {
 		return nil
 	}
 

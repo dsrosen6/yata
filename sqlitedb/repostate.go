@@ -27,7 +27,7 @@ func (ar *AppStateRepo) Get(ctx context.Context) (*models.AppState, error) {
 }
 
 func (ar *AppStateRepo) Create(ctx context.Context) (*models.AppState, error) {
-	ds, err := ar.q.CreateAppState(ctx, nil)
+	ds, err := ar.q.CreateAppState(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (ar *AppStateRepo) Update(ctx context.Context, s *models.AppState) (*models
 	if s == nil {
 		return nil, errors.New("received nil app state")
 	}
-	ds, err := ar.q.UpdateAppState(ctx, s.SelectedProjectID)
+	ds, err := ar.q.UpdateAppState(ctx, stateToUpdateParams(s))
 	if err != nil {
 		return nil, err
 	}
@@ -47,9 +47,10 @@ func (ar *AppStateRepo) Update(ctx context.Context, s *models.AppState) (*models
 	return dbStateToState(ds), nil
 }
 
-func stateToUpdateParams(s *models.AppState) *AppState {
-	return &AppState{
+func stateToUpdateParams(s *models.AppState) *UpdateAppStateParams {
+	return &UpdateAppStateParams{
 		SelectedProjectID: s.SelectedProjectID,
+		ShowHelp:          s.ShowHelp,
 	}
 }
 
@@ -57,6 +58,7 @@ func dbStateToState(s *AppState) *models.AppState {
 	return &models.AppState{
 		ID:                s.ID,
 		SelectedProjectID: s.SelectedProjectID,
+		ShowHelp:          s.ShowHelp,
 		CreatedAt:         s.CreatedAt,
 		UpdatedAt:         s.UpdatedAt,
 	}

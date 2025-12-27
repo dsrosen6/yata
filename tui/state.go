@@ -42,20 +42,22 @@ func getAppState(stores *models.AllRepos) (*models.AppState, error) {
 
 func (m *model) saveAppState() error {
 	ctx := context.Background()
-	var sel *int64
-	if m.currentProjectID != 0 {
-		sel = &m.currentProjectID
-	}
-
-	s := &models.AppState{
-		SelectedProjectID: sel,
-	}
-
-	slog.Debug("updating app state", "selected_project_id", m.currentProjectID)
-	if _, err := m.stores.AppState.Update(ctx, s); err != nil {
+	if _, err := m.stores.AppState.Update(ctx, m.state); err != nil {
 		return fmt.Errorf("updating saved app state: %w", err)
 	}
-	slog.Debug("app state updated")
+	slog.Debug("app state updated", logAppState(m.state))
 
 	return nil
+}
+
+func logAppState(s *models.AppState) slog.Attr {
+	var selProj int64
+	if s.SelectedProjectID != nil {
+		selProj = *s.SelectedProjectID
+	}
+	return slog.Group(
+		"app state",
+		slog.Int64("selected_project_id", selProj),
+		slog.Bool("show_help", s.ShowHelp),
+	)
 }

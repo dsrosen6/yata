@@ -98,7 +98,7 @@ func (m *model) helpKeys() []key.Binding {
 	k := []key.Binding{m.keys.newTask, m.keys.newProject}
 	switch m.currentFocus {
 	case focusProjects:
-		if m.selectedProjectID() != 0 {
+		if m.selectedProjectID() != nil {
 			k = append(k, m.keys.delete)
 		}
 	case focusTasks:

@@ -10,20 +10,17 @@ import (
 )
 
 const createAppState = `-- name: CreateAppState :one
-INSERT INTO app_state (
-    selected_project_id
-) VALUES (
-    ?
-)
-RETURNING id, selected_project_id, created_at, updated_at
+INSERT INTO app_state DEFAULT VALUES
+RETURNING id, selected_project_id, show_help, created_at, updated_at
 `
 
-func (q *Queries) CreateAppState(ctx context.Context, selectedProjectID *int64) (*AppState, error) {
-	row := q.db.QueryRowContext(ctx, createAppState, selectedProjectID)
+func (q *Queries) CreateAppState(ctx context.Context) (*AppState, error) {
+	row := q.db.QueryRowContext(ctx, createAppState)
 	var i AppState
 	err := row.Scan(
 		&i.ID,
 		&i.SelectedProjectID,
+		&i.ShowHelp,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -31,7 +28,7 @@ func (q *Queries) CreateAppState(ctx context.Context, selectedProjectID *int64) 
 }
 
 const getAppState = `-- name: GetAppState :one
-SELECT id, selected_project_id, created_at, updated_at FROM app_state
+SELECT id, selected_project_id, show_help, created_at, updated_at FROM app_state
 LIMIT 1
 `
 
@@ -41,6 +38,7 @@ func (q *Queries) GetAppState(ctx context.Context) (*AppState, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.SelectedProjectID,
+		&i.ShowHelp,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -51,17 +49,24 @@ const updateAppState = `-- name: UpdateAppState :one
 UPDATE app_state
 SET
     selected_project_id = ?,
+    show_help = ?,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = 1
-RETURNING id, selected_project_id, created_at, updated_at
+RETURNING id, selected_project_id, show_help, created_at, updated_at
 `
 
-func (q *Queries) UpdateAppState(ctx context.Context, selectedProjectID *int64) (*AppState, error) {
-	row := q.db.QueryRowContext(ctx, updateAppState, selectedProjectID)
+type UpdateAppStateParams struct {
+	SelectedProjectID *int64
+	ShowHelp          bool
+}
+
+func (q *Queries) UpdateAppState(ctx context.Context, arg *UpdateAppStateParams) (*AppState, error) {
+	row := q.db.QueryRowContext(ctx, updateAppState, arg.SelectedProjectID, arg.ShowHelp)
 	var i AppState
 	err := row.Scan(
 		&i.ID,
 		&i.SelectedProjectID,
+		&i.ShowHelp,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

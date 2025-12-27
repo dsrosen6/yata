@@ -11,6 +11,7 @@ import (
 type AppState struct {
 	ID                int64
 	SelectedProjectID *int64
+	ShowHelp          bool
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
