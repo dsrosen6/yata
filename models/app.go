@@ -8,6 +8,7 @@ type StoreHandler interface {
 }
 
 type AllRepos struct {
+	AppState AppStateRepo
 	Tasks    TaskRepo
 	Projects ProjectRepo
 }

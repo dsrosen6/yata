@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+type AppState struct {
+	ID                int64
+	SelectedProjectID *int64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
 type Project struct {
 	ID              int64
 	Title           string

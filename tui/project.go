@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -13,8 +14,9 @@ import (
 )
 
 type (
-	refreshProjectsMsg    struct{ selectProjectID int64 }
-	gotUpdatedProjectsMsg struct {
+	selectedProjectChangedMsg struct{ selected int64 }
+	refreshProjectsMsg        struct{ selectProjectID int64 }
+	gotUpdatedProjectsMsg     struct {
 		projects        []list.Item
 		selectProjectID int64
 	}
@@ -24,8 +26,8 @@ func (m *model) checkProjectChanged() tea.Cmd {
 	return func() tea.Msg {
 		sel := m.selectedProjectID()
 		if m.currentProjectID != sel {
-			m.currentProjectID = sel
-			return refreshTasksMsg{selectTaskID: 0}
+			slog.Debug("selected project ID changed", "prev", m.currentProjectID, "new", sel)
+			return selectedProjectChangedMsg{selected: sel}
 		}
 		return nil
 	}

@@ -48,6 +48,7 @@ func (h *Handler) Close() error {
 
 func NewRepos(q *Queries) *models.AllRepos {
 	return &models.AllRepos{
+		AppState: NewAppStateRepo(q),
 		Tasks:    NewTaskRepo(q),
 		Projects: NewProjectRepo(q),
 	}

@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -24,21 +23,25 @@ const (
 
 type (
 	model struct {
+		appState         *models.AppState
 		stores           *models.AllRepos
 		keys             keyMap
 		help             help.Model
 		showHelp         bool
 		taskList         list.Model
 		projectList      list.Model
-		taskEntryForm    *form.Model
-		projectEntryForm *form.Model
 		sortParams       *models.SortParams
 		currentFocus     focus
 		currentProjectID int64
 
+		forms
 		dimensions
 	}
 
+	forms struct {
+		taskEntryForm    *form.Model
+		projectEntryForm *form.Model
+	}
 	dimensionsCalculatedMsg struct{ dimensions }
 )
 
@@ -53,31 +56,36 @@ func initialModel(stores *models.AllRepos) (*model, error) {
 		return nil, fmt.Errorf("creating project entry form: %w", err)
 	}
 
-	tasks, err := stores.Tasks.ListAll(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("getting initial tasks: %w", err)
+	forms := forms{
+		taskEntryForm:    te,
+		projectEntryForm: pe,
 	}
 
-	projects, err := stores.Projects.ListAll(context.Background())
+	s, err := getAppState(stores)
 	if err != nil {
-		return nil, fmt.Errorf("getting initial projects: %w", err)
+		return nil, fmt.Errorf("getting initial app state: %w", err)
 	}
 
 	return &model{
-		stores:           stores,
-		keys:             defaultKeyMap,
-		help:             help.New(),
-		showHelp:         true,
-		taskList:         initialTaskList(tasks),
-		projectList:      initialProjectList(projects),
-		taskEntryForm:    te,
-		projectEntryForm: pe,
-		sortParams:       &models.SortParams{SortBy: models.SortByComplete},
+		appState:    s,
+		stores:      stores,
+		keys:        defaultKeyMap,
+		help:        help.New(),
+		showHelp:    true,
+		taskList:    initialTaskList(),
+		projectList: initialProjectList(),
+		sortParams:  &models.SortParams{SortBy: models.SortByComplete},
+		forms:       forms,
 	}, nil
 }
 
 func (m *model) Init() tea.Cmd {
-	return nil
+	var sel int64
+	if m.appState.SelectedProjectID != nil {
+		sel = *m.appState.SelectedProjectID
+	}
+
+	return m.refreshProjects(sel)
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -99,7 +107,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, m.keys.quit):
 			if !m.currentFocus.isEntry() {
-				return m, tea.Quit
+				return m, m.quit()
 			}
 		case key.Matches(msg, m.keys.toggleHelp):
 			if !m.currentFocus.isEntry() {
@@ -167,6 +175,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return m, tea.Batch(cmds...)
+
+	case selectedProjectChangedMsg:
+		m.currentProjectID = msg.selected
+		return m, m.getUpdatedTasks(m.currentProjectID, 0)
 	}
 
 	switch m.currentFocus {
