@@ -143,6 +143,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskList.SetItems(msg.tasks),
 			m.adjustTaskListIndex(),
 			m.selectTask(msg.selectTaskID),
+			m.calculateDimensions(m.windowW, m.windowH),
 		}
 
 		return m, tea.Batch(cmds...)

@@ -71,7 +71,7 @@ func (b Box) Render(w, h int) string {
 	// Get size of top border by comparing before/after removing
 	// Render top row with the title
 	top := topBorder(b.TitleAlignment, w, b.BoxStyle, b.TitleStyle, b.Title)
-	contentH := h - bottomBorderH(b.BoxStyle)
+	contentH := h
 	if contentH <= 0 {
 		return top
 	}
@@ -88,7 +88,7 @@ func (b Box) Render(w, h int) string {
 }
 
 func (b Box) FrameSize() (fw, fh int) {
-	return b.BoxStyle.Padding(0).BorderTop(false).GetFrameSize()
+	return b.BoxStyle.Padding(0).GetFrameSize()
 }
 
 func topBorder(align Alignment, width int, boxStyle, titleStyle lipgloss.Style, title string) string {
@@ -126,10 +126,4 @@ func topBorder(align Alignment, width int, boxStyle, titleStyle lipgloss.Style, 
 	left := styler(strings.Repeat(border.Top, leftFill))
 	right := styler(strings.Repeat(border.Top, rightFill))
 	return topLeft + left + titleStr + right + topRight
-}
-
-func bottomBorderH(s lipgloss.Style) int {
-	_, full := s.GetFrameSize()
-	_, rm := s.BorderBottom(false).GetFrameSize()
-	return full - rm
 }

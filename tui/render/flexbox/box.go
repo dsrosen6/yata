@@ -66,21 +66,7 @@ func (b *Box) RemoveItemAt(i int) *Box {
 }
 
 func (b *Box) FrameSize() (int, int) {
-	if len(b.Items) == 0 {
-		return 0, 0
-	}
-
-	var widths, heights []int
-	for _, it := range b.Items {
-		fw, fh := it.Node.FrameSize()
-		widths = append(widths, fw)
-		heights = append(heights, fh)
-	}
-
-	if b.Direction == Vertical {
-		return slices.Max(widths), sum(heights)
-	}
-	return sum(widths), slices.Max(heights)
+	return 0, 0
 }
 
 // GetAllItemsFrameSize gets the combined total frame widths and heights of a flexbox.
@@ -172,7 +158,6 @@ func (b *Box) calculateItemLayouts(w, h int) *LayoutsHandler {
 		fw, fh := it.Node.FrameSize()
 
 		// add frame size for all items
-
 		if b.Direction == Vertical {
 			totalFrameMain += fh
 		} else {
@@ -197,9 +182,7 @@ func (b *Box) calculateItemLayouts(w, h int) *LayoutsHandler {
 
 	// calculate usable space for flexible items
 	usableM := mainSize - totalFrameMain - fixedMainTotal
-	if usableM < 0 {
-		usableM = 0
-	}
+	usableM = max(0, usableM)
 
 	// second pass: render items
 	usedFlexible := 0
@@ -256,9 +239,7 @@ func (b *Box) calculateItemLayouts(w, h int) *LayoutsHandler {
 			}
 		}
 
-		if itemMain < 0 {
-			itemMain = 0
-		}
+		itemMain = max(0, itemMain)
 
 		cw := itemMain
 		ch := itemCross
@@ -287,13 +268,4 @@ func (b *Box) calculateItemLayouts(w, h int) *LayoutsHandler {
 // an extra line defining the int isn't necessary.
 func FixedSize(s int) *int {
 	return &s
-}
-
-func sum(s []int) int {
-	total := 0
-	for _, i := range s {
-		total += i
-	}
-
-	return total
 }
