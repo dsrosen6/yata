@@ -9,6 +9,10 @@ WHERE parent_project_id = ?;
 SELECT * FROM project
 WHERE id = ? LIMIT 1;
 
+-- name: GetProjectByTitle :one
+SELECT * FROM project
+WHERE title = ? LIMIT 1;
+
 -- name: CreateProject :one
 INSERT INTO project (
     title,

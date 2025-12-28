@@ -43,6 +43,15 @@ func (pr *ProjectRepo) Get(ctx context.Context, id int64) (*models.Project, erro
 	return dbProjectToProject(d), nil
 }
 
+func (pr *ProjectRepo) GetByTitle(ctx context.Context, title string) (*models.Project, error) {
+	d, err := pr.q.GetProjectByTitle(ctx, title)
+	if err != nil {
+		return nil, err
+	}
+
+	return dbProjectToProject(d), nil
+}
+
 func (pr *ProjectRepo) Create(ctx context.Context, p *models.Project) (*models.Project, error) {
 	d, err := pr.q.CreateProject(ctx, projectToCreateParams(p))
 	if err != nil {

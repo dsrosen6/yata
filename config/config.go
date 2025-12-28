@@ -40,8 +40,23 @@ type (
 	}
 
 	GeneralOpts struct {
+		// SelectedProject is the project that will be selected when the app is opened. If not specified,
+		// it will default to the most recently selected project. If specified and a project by that title
+		// doesn't exist, it will be created.
+		//
+		// Special options which won't create or select a specific project:
+		// 	"all": all filter at the top of the project list will be selected.
+		// 	"most_recent": default (works, but not necessary)
 		SelectedProject string
-		ShowHelp        HelpOpt
+
+		// ShowHelp determines if the help keys are shown at the bottom of the app when opened.
+		// Default is to use the most recent.
+		//
+		// Valid options:
+		// 	"enable"
+		// 	"disable"
+		// 	"most_recent": default (works, but not necessary)
+		ShowHelp HelpOpt
 	}
 
 	StyleOpts struct {

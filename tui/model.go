@@ -89,6 +89,7 @@ func initialModel(cfg *config.Config, stores *models.AllRepos) (*model, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting initial app state: %w", err)
 	}
+	applyConfigOverrides(s, cfg, stores)
 	slog.Debug("got initial app state", logAppState(s))
 
 	return &model{

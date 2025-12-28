@@ -64,6 +64,24 @@ func (q *Queries) GetProject(ctx context.Context, id int64) (*Project, error) {
 	return &i, err
 }
 
+const getProjectByTitle = `-- name: GetProjectByTitle :one
+SELECT id, title, parent_project_id, created_at, updated_at FROM project
+WHERE title = ? LIMIT 1
+`
+
+func (q *Queries) GetProjectByTitle(ctx context.Context, title string) (*Project, error) {
+	row := q.db.QueryRowContext(ctx, getProjectByTitle, title)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.ParentProjectID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const listAllProjects = `-- name: ListAllProjects :many
 SELECT id, title, parent_project_id, created_at, updated_at FROM project
 `
