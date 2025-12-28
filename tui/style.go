@@ -17,12 +17,12 @@ type styles struct {
 
 func generateStyles(cfg *config.Config) styles {
 	return styles{
-		focusedBoxStyle:        lipgloss.NewStyle().Border(cfg.Focused.BorderType).BorderForeground(cfg.Focused.BorderColor).Foreground(cfg.Focused.TextColor),
-		focusedBoxTitleStyle:   lipgloss.NewStyle().Foreground(cfg.Focused.BoxTitleColor),
-		focusedTextStyle:       lipgloss.NewStyle().Foreground(cfg.Focused.TextColor),
-		unfocusedBoxStyle:      lipgloss.NewStyle().Border(cfg.Unfocused.BorderType).BorderForeground(cfg.Unfocused.BorderColor),
-		unfocusedBoxTitleStyle: lipgloss.NewStyle().Foreground(cfg.Unfocused.BoxTitleColor),
-		unfocusedTextStyle:     lipgloss.NewStyle().Foreground(cfg.Unfocused.TextColor),
-		errorTextStyle:         lipgloss.NewStyle().Foreground(cfg.ErrorTextColor),
+		focusedBoxStyle:        lipgloss.NewStyle().Border(cfg.Style.Focused.BorderType).BorderForeground(cfg.Style.Focused.BorderColor).Foreground(cfg.Style.Focused.TextColor),
+		focusedBoxTitleStyle:   lipgloss.NewStyle().Foreground(cfg.Style.Focused.BoxTitleColor),
+		focusedTextStyle:       lipgloss.NewStyle().Foreground(cfg.Style.Focused.TextColor),
+		unfocusedBoxStyle:      lipgloss.NewStyle().Border(cfg.Style.Unfocused.BorderType).BorderForeground(cfg.Style.Unfocused.BorderColor),
+		unfocusedBoxTitleStyle: lipgloss.NewStyle().Foreground(cfg.Style.Unfocused.BoxTitleColor),
+		unfocusedTextStyle:     lipgloss.NewStyle().Foreground(cfg.Style.Unfocused.TextColor),
+		errorTextStyle:         lipgloss.NewStyle().Foreground(cfg.Style.ErrorTextColor),
 	}
 }

@@ -8,10 +8,13 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/dsrosen6/yata/config"
 	"github.com/dsrosen6/yata/models"
 	"github.com/dsrosen6/yata/tui/models/form"
 	fbox "github.com/dsrosen6/yata/tui/render/flexbox"
 )
+
+var allStyles styles
 
 const (
 	topBoxName    = "topBox"
@@ -24,6 +27,7 @@ const (
 
 type (
 	model struct {
+		cfg          *config.Config
 		state        *models.AppState
 		stores       *models.AllRepos
 		keys         keyMap
@@ -51,7 +55,21 @@ type (
 	dimensionsCalculatedMsg struct{ dimensions }
 )
 
-func initialModel(stores *models.AllRepos) (*model, error) {
+func Run(cfg *config.Config, stores *models.AllRepos) error {
+	allStyles = generateStyles(cfg)
+	m, err := initialModel(cfg, stores)
+	if err != nil {
+		return fmt.Errorf("creating model: %w", err)
+	}
+
+	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func initialModel(cfg *config.Config, stores *models.AllRepos) (*model, error) {
 	te, err := newTaskEntryForm()
 	if err != nil {
 		return nil, fmt.Errorf("creating task entry form: %w", err)
@@ -74,6 +92,7 @@ func initialModel(stores *models.AllRepos) (*model, error) {
 	slog.Debug("got initial app state", logAppState(s))
 
 	return &model{
+		cfg:         cfg,
 		state:       s,
 		stores:      stores,
 		keys:        defaultKeyMap,

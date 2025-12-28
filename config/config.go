@@ -11,63 +11,95 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type ConfigIn struct {
-	Focused struct {
-		BorderColor   *uint   `json:"border_color"`
-		TextColor     *uint   `json:"text_color"`
-		BoxTitleColor *uint   `json:"box_title_color"`
-		BorderType    *string `json:"border_type"`
-	} `json:"focused"`
+type (
+	ConfigIn struct {
+		General struct {
+			SelectedProject string  `json:"selected_project"`
+			ShowHelp        HelpOpt `json:"show_help"`
+		} `json:"general"`
+		Style struct {
+			Focused struct {
+				BorderColor   *uint   `json:"border_color"`
+				TextColor     *uint   `json:"text_color"`
+				BoxTitleColor *uint   `json:"box_title_color"`
+				BorderType    *string `json:"border_type"`
+			} `json:"focused"`
+			Unfocused struct {
+				BorderColor   *uint   `json:"border_color"`
+				TextColor     *uint   `json:"text_color"`
+				BoxTitleColor *uint   `json:"box_title_color"`
+				BorderType    *string `json:"border_type"`
+			} `json:"unfocused"`
+			ErrorText *uint `json:"error_text_color"`
+		} `json:"style"`
+	}
 
-	Unfocused struct {
-		BorderColor   *uint   `json:"border_color"`
-		TextColor     *uint   `json:"text_color"`
-		BoxTitleColor *uint   `json:"box_title_color"`
-		BorderType    *string `json:"border_type"`
-	} `json:"unfocused"`
+	Config struct {
+		General GeneralOpts
+		Style   StyleOpts
+	}
 
-	ErrorTextColor *uint `json:"error_text_color"`
-}
+	GeneralOpts struct {
+		SelectedProject string
+		ShowHelp        HelpOpt
+	}
 
-type Config struct {
-	Focused        FocusedOpts
-	Unfocused      UnfocusedOpts
-	ErrorTextColor lipgloss.ANSIColor
-}
+	StyleOpts struct {
+		Focused        FocusedOpts
+		Unfocused      UnfocusedOpts
+		ErrorTextColor lipgloss.ANSIColor
+	}
 
-type FocusedOpts struct {
-	BorderColor   lipgloss.ANSIColor
-	TextColor     lipgloss.ANSIColor
-	BoxTitleColor lipgloss.ANSIColor
-	BorderType    lipgloss.Border
-}
+	FocusedOpts struct {
+		BorderColor   lipgloss.ANSIColor
+		TextColor     lipgloss.ANSIColor
+		BoxTitleColor lipgloss.ANSIColor
+		BorderType    lipgloss.Border
+	}
 
-type UnfocusedOpts struct {
-	BorderColor   lipgloss.ANSIColor
-	TextColor     lipgloss.ANSIColor
-	BoxTitleColor lipgloss.ANSIColor
-	BorderType    lipgloss.Border
-}
+	UnfocusedOpts struct {
+		BorderColor   lipgloss.ANSIColor
+		TextColor     lipgloss.ANSIColor
+		BoxTitleColor lipgloss.ANSIColor
+		BorderType    lipgloss.Border
+	}
+
+	HelpOpt string
+)
+
+const (
+	HelpOptMostRecent HelpOpt = "most_recent"
+	HelpOptEnable     HelpOpt = "enable"
+	HelpOptDisable    HelpOpt = "disable"
+)
 
 var (
-	defaultFocusedColor   = lipgloss.ANSIColor(4) // blue
-	defaultUnfocusedColor = lipgloss.ANSIColor(7) // white
-	defaultErrorColor     = lipgloss.ANSIColor(1) // red
+	defaultFocusedColor    = lipgloss.ANSIColor(7) // white
+	defaultUnfocusedColor  = lipgloss.ANSIColor(8) // gray
+	defaultErrorColor      = lipgloss.ANSIColor(1) // red
+	defaultHelpOpt         = HelpOptMostRecent
+	defaultSelectedProject = "most_recent"
 
 	defaultConfig = Config{
-		Focused: FocusedOpts{
-			BorderColor:   defaultFocusedColor,
-			TextColor:     defaultFocusedColor,
-			BoxTitleColor: defaultFocusedColor,
-			BorderType:    lipgloss.DoubleBorder(),
+		General: GeneralOpts{
+			SelectedProject: defaultSelectedProject,
+			ShowHelp:        defaultHelpOpt,
 		},
-		Unfocused: UnfocusedOpts{
-			BorderColor:   defaultUnfocusedColor,
-			TextColor:     defaultUnfocusedColor,
-			BoxTitleColor: defaultUnfocusedColor,
-			BorderType:    lipgloss.NormalBorder(),
+		Style: StyleOpts{
+			Focused: FocusedOpts{
+				BorderColor:   defaultFocusedColor,
+				TextColor:     defaultFocusedColor,
+				BoxTitleColor: defaultFocusedColor,
+				BorderType:    lipgloss.DoubleBorder(),
+			},
+			Unfocused: UnfocusedOpts{
+				BorderColor:   defaultUnfocusedColor,
+				TextColor:     defaultUnfocusedColor,
+				BoxTitleColor: defaultUnfocusedColor,
+				BorderType:    lipgloss.NormalBorder(),
+			},
+			ErrorTextColor: defaultErrorColor,
 		},
-		ErrorTextColor: defaultErrorColor,
 	}
 )
 
@@ -96,19 +128,25 @@ func configInToConfig(in *ConfigIn) *Config {
 		return &dc
 	}
 	return &Config{
-		Focused: FocusedOpts{
-			BorderColor:   uintPtrToColor(in.Focused.BorderColor, dc.Focused.BorderColor),
-			TextColor:     uintPtrToColor(in.Focused.TextColor, dc.Focused.TextColor),
-			BoxTitleColor: uintPtrToColor(in.Focused.BoxTitleColor, dc.Focused.BoxTitleColor),
-			BorderType:    strPtrToBorder(in.Focused.BorderType, dc.Focused.BorderType),
+		General: GeneralOpts{
+			SelectedProject: selectedProject(in.General.SelectedProject, dc.General.SelectedProject),
+			ShowHelp:        helpOpt(in.General.ShowHelp, dc.General.ShowHelp),
 		},
-		Unfocused: UnfocusedOpts{
-			BorderColor:   uintPtrToColor(in.Unfocused.BorderColor, dc.Unfocused.BorderColor),
-			TextColor:     uintPtrToColor(in.Unfocused.TextColor, dc.Unfocused.TextColor),
-			BoxTitleColor: uintPtrToColor(in.Unfocused.BoxTitleColor, dc.Unfocused.BoxTitleColor),
-			BorderType:    strPtrToBorder(in.Unfocused.BorderType, dc.Unfocused.BorderType),
+		Style: StyleOpts{
+			Focused: FocusedOpts{
+				BorderColor:   uintPtrToColor(in.Style.Focused.BorderColor, dc.Style.Focused.BorderColor),
+				TextColor:     uintPtrToColor(in.Style.Focused.TextColor, dc.Style.Focused.TextColor),
+				BoxTitleColor: uintPtrToColor(in.Style.Focused.BoxTitleColor, dc.Style.Focused.BoxTitleColor),
+				BorderType:    strPtrToBorder(in.Style.Focused.BorderType, dc.Style.Focused.BorderType),
+			},
+			Unfocused: UnfocusedOpts{
+				BorderColor:   uintPtrToColor(in.Style.Unfocused.BorderColor, dc.Style.Unfocused.BorderColor),
+				TextColor:     uintPtrToColor(in.Style.Unfocused.TextColor, dc.Style.Unfocused.TextColor),
+				BoxTitleColor: uintPtrToColor(in.Style.Unfocused.BoxTitleColor, dc.Style.Unfocused.BoxTitleColor),
+				BorderType:    strPtrToBorder(in.Style.Unfocused.BorderType, dc.Style.Unfocused.BorderType),
+			},
+			ErrorTextColor: uintPtrToColor(in.Style.ErrorText, dc.Style.ErrorTextColor),
 		},
-		ErrorTextColor: uintPtrToColor(in.ErrorTextColor, dc.ErrorTextColor),
 	}
 }
 
@@ -157,5 +195,23 @@ func strPtrToBorder(s *string, defBorder lipgloss.Border) lipgloss.Border {
 		return lipgloss.ThickBorder()
 	default:
 		return defBorder
+	}
+}
+
+func selectedProject(in, def string) string {
+	switch in {
+	case "":
+		return def
+	default:
+		return in
+	}
+}
+
+func helpOpt(in, def HelpOpt) HelpOpt {
+	switch in {
+	case HelpOptMostRecent, HelpOptEnable, HelpOptDisable:
+		return in
+	default:
+		return def
 	}
 }
